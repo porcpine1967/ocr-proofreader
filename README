@@ -1,0 +1,24 @@
+This module supports the conversion of scanned documents into accurate text.
+
+If the scans are bound up in a pdf, you will need to run something like pdfimages to extract them into readable images.
+
+The module consists of utilities that accomplish the following:
+ * Turn the images into text
+  * Splitting of images of two pages into two images of a single page each.
+  * Running each page through tesseract to extract the text into appropriately-named documents (one document per page)
+ * Clean up common ocr errors
+  * Utility to remove 'garbage lines' (interactive)
+  * Utility to remove headers (batch)
+  * Utility to join words separated by hyphen-line breaks
+  * Utility to correct common recognition mistakes (e.g. rn -> m)
+
+# To implement
+  * orthography fix
+  * add join-across lines when interactive checking
+  * add ability to add a note to FIX ME
+  * generate shell file for FIX ME
+  * English check for single character not I, a, or A
+
+
+# To investigate
+  * Use images to find paragraphs
