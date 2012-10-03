@@ -192,7 +192,7 @@ class BaseSpellChecker(object):
         Will only hyphenate if min_chars (default 3) or more characters
         on each side."""
         
-	spell_version = ' '.join(self.check_line(word)).decode('utf-8')
+	spell_version = _decode(' '.join(self.check_line(word)))
         # don't fix if it isn't broken
         # don't fix if could not have minimum characters
         # on each side
@@ -211,7 +211,7 @@ class BaseSpellChecker(object):
             fixed_versions.append((new_word, 'hyphen-at-{}'.format(idx),))
 	if fixed_versions:
             fixed_words = [t[0] for t in fixed_versions]
-            bad_versions = [v.decode('utf-8') for v in self.check_line(' '.join(fixed_words))]
+            bad_versions = [_decode(v) for v in self.check_line(' '.join(fixed_words))]
             good_versions = [item for item in fixed_words if item not in bad_versions]
         else:
             good_versions = []
@@ -254,7 +254,7 @@ class BaseSpellChecker(object):
 
 	# sometimes the spell checker does
 	# not return the entire word
-	spell_version = ' '.join(self.check_line(word)).decode('utf-8')
+	spell_version = u' '.join(self.check_line(word))
         # don't fix if it isn't broken
         if not spell_version:
             return word
@@ -279,7 +279,7 @@ class BaseSpellChecker(object):
             # try replacing between one and all - TODO
 	if fixed_versions:
             fixed_words = [t[0] for t in fixed_versions]
-            bad_versions = [v.decode('utf-8') for v in self.check_line(' '.join(fixed_words))]
+            bad_versions = [_decode(v) for v in self.check_line(' '.join(fixed_words))]
             good_versions = [item for item in fixed_words if item not in bad_versions]
         else:
             good_versions = []
@@ -372,4 +372,11 @@ class AlreadyCheckedSpellChecker(BaseSpellChecker):
     def fix_spelling(self, word):
         return word
     def hyphenate(self, word):
+        return word
+
+def _decode(word):
+    """ Returns the word maybe decoded to utf-8."""
+    try:
+        return word.decode('utf-8') 
+    except UnicodeEncodeError:
         return word
