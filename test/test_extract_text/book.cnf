@@ -1,0 +1,4 @@
+[extract_text]
+start_page_number=4
+ignore_pages=two/two-000-a.pbm three/three-000-b.pbm
+ordered_dirnames=one two three

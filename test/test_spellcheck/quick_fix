@@ -1,0 +1,32 @@
+bob=|bob-
+bob==|bob-
+bob<=|bob-
+bob<|bob-
+bob~|bob-
+bob»|bob-
+bob—|bob-
+bob–|bob-
+bob=bob|bob-bob
+bob==bob|bob-bob
+bob=<bob|bob-bob
+bob<bob|bob-bob
+bob~bob|bob-bob
+bob»bob|bob-bob
+bob—bob|bob-bob
+bob–bob|bob-bob
+a < a|a < a
+a = a|a = a
+a ~ a|a - a
+a ~~ a|a - a
+a ~—~ a|a - a
+a » a|a - a
+a — a|a - a
+a – a|a - a
+it ﬁres|it fires
+it ﬂies|it flies
+‘I am awesome,’ he said|'I am awesome,' he said
+“I am awesome,” he said|"I am awesome," he said
+I like _]ulia|I like Julia
+I like ]ulia|I like Julia
+He said, 'I-Iello.'|He said, 'Hello.'
+He said, 'I-lello.'|He said, 'Hello.'

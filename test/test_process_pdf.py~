@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+import unittest
+import os
+import shutil
+import sys
+PATH = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append('{}/..'.format(PATH))
+
+import process_pdf
+
+
+class PdfProcessorTest(unittest.TestCase):
+    def setUp(self):
+        pass
+    def tearDown(self):
+        pass
+
+    def test_extract_images(self):
+        
+        os.chdir('{}/test_extract'.format(PATH))
+        try:
+            shutil.rmtree('images')
+        except OSError:
+            pass # images already removed
+        pdf_processor = process_pdf.PdfProcessor()        
+        pdf_processor.extract_images_from_pdfs()
+        self.assertEqual(4, len([fn for fn in os.listdir('images/raw/one')]))
+        self.assertEqual(4, len([fn for fn in os.listdir('images/raw/two')]))
+        shutil.rmtree('images')
+    def test_crop(self):
+        os.chdir('{}/test_crop'.format(PATH))
+        try:
+            shutil.rmtree('images/cropped')
+        except OSError:
+            pass # images/cropped already removed
+
+        pdf_processor = process_pdf.PdfProcessor()        
+        pdf_processor.extract_pages_from_images()
+        self.assertEqual(8, len([fn for fn in os.listdir('images/cropped/one')]))
+        shutil.rmtree('images/cropped')
+
+    def test_extract_text(self):
+        os.chdir('{}/test_extract_text'.format(PATH))
+        try:
+            shutil.rmtree('text')
+        except OSError:
+            pass # text already removed
+
+        pdf_processor = process_pdf.PdfProcessor()        
+        pdf_processor.extract_test_from_images()
+        
+if __name__ == '__main__':
+
+    unittest.main()
