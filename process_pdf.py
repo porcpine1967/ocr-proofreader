@@ -9,19 +9,117 @@ import Image
 
 import matplotlib.pyplot as plt
 
+class ImageHeuristic(object):
+    """ Analyzes images
+    and provides best-guess/fallback
+    for where to crop.
+    """
+    def __init__(self, verbose=False):
+        self.verbose=verbose
+        self.image_analyzers = []
+        self.analyzed = False
+                
+    def add_image(self, image_path):
+        try:
+            if self.verbose:
+                print 'Adding:', image_path
+            self.image_analyzers.append(ImageAnalyzer(image_path))
+        except PageCropException:
+            print 'IGNORING BAD PAGE:', image_path
+        
+    def analyze(self):
+        if self.verbose:
+            print 'Starting to Analyze'
+        pages = []
+        for ia in self.image_analyzers:
+            if self.verbose:
+                print 'Adding info for', ia.image_file_base
+                print '  width a:', ia.page_a.width
+                print '  width b:', ia.page_b.width
+            pages.append(ia.page_a)
+            pages.append(ia.page_b)
+        median_width = sorted([page.width for page in pages])[len(pages)/2]
+
+        print median_width
+        good_page_a_starts = []
+        good_page_a_ends = []
+        good_page_b_starts = []
+        good_page_b_ends = []
+        for ia in self.image_analyzers:
+            if ia.page_a.in_bounds(median_width):
+                good_page_a_starts.append(ia.page_a.start)
+                good_page_a_ends.append(ia.page_a.end)
+            if ia.page_b.in_bounds(median_width):
+                good_page_b_starts.append(ia.page_b.start)
+                good_page_b_ends.append(ia.page_b.end)
+        for ia in self.image_analyzers:
+            if not ia.page_a.in_bounds(median_width):
+                ia.page_a.start = min(good_page_a_starts)
+                ia.page_a.end = max(good_page_a_ends)
+            if not ia.page_b.in_bounds(median_width):
+                ia.page_b.start = min(good_page_b_starts)
+                ia.page_b.end = max(good_page_b_ends)
+        self.analyzed = True
+
+    def crop_all(self, destination_dir, check_for_analysis=True):
+        if not self.image_analyzers:
+            return
+        if check_for_analysis and not self.analyzed:
+            self.analyze()
+        for ia in self.image_analyzers:
+            ia.crop(destination_dir, self.verbose)
+        
+class Page(object):
+    def __init__(self, position_tuple, double_width):
+        self.start, self.end = position_tuple
+        self.width = self.end - self.start
+        self.full_width = double_width/2.0
+
+    def in_bounds(self, median_width):
+        if self.width < self.full_width:
+            return (median_width - self.width)/self.full_width < .01 
+        else:
+            raise PageCropException('Wider than half page width')
 
 class ImageAnalyzer(object):
 
     def __init__(self, path_to_image):
-        im = Image.open(path_to_image)
+        self.path_to_image = path_to_image
+        im = Image.open(self.path_to_image)
         image_file_name = os.path.basename(path_to_image)
-        self.image_file_base, ext = os.path.splitext(image_file_name)
-        self.rows, self.columns = self.rows_and_columns(im)
+        self.image_file_base, self.image_ext = os.path.splitext(image_file_name)
+        self.load_pages(im)
 
+    def crop(self, destination_dir, verbose):
+        im = Image.open(self.path_to_image)
+        image_page_a = im.crop((self.page_a.start -5, 0, self.page_a.end + 5, self.im_height,))
+        image_page_a.save('{}/{}-a{}'.format(destination_dir, self.image_file_base, self.image_ext))
+	if verbose:
+            print '{}-a saved'.format(self.image_file_base)
+        if verbose:
+            print 'Cropping {} to {} - {}'.format(self.image_file_base, self.page_b.start, self.page_b.end)
+        image_page_b = im.crop((self.page_b.start -5, 0, self.page_b.end + 5, self.im_height,))
+        image_page_b.save('{}/{}-b{}'.format(destination_dir, self.image_file_base, self.image_ext))
+	if verbose:
+            print '{}-b saved'.format(self.image_file_base)
+
+    def load_pages(self, im):
+        page_data_a, page_data_b = self.text_columns(im)
+        self.page_a = Page(page_data_a, self.im_width)
+        self.page_b = Page(page_data_b, self.im_width)
+
+    def columns(self, im):
+        self.im_width, self.im_height = im.size
+        
+        columns = [[] for i in xrange(self.im_width)]
+        for index, pixel, in enumerate(im.getdata()):
+            columns[index % self.im_width].append(pixel)
+        return columns
     def rows_and_columns(self, im):
         """ Returns the pixel values of an image
         divided into two multidimensional arrays."""
     
+        self.im_width, self.im_height = im.size
         width, height = im.size
         rows = []
         current_row = None
@@ -77,17 +175,18 @@ class ImageAnalyzer(object):
             full_tuples.append((fbr, first_black_column, lbr, last_black_column,))
         return full_tuples
         
-    def text_columns(self, ):
+    def text_columns(self, im):
         """ Divides the image into strips divided by whitespace
         (within sensitivity pixels of being a pure white column).
         returns the x boundaries of the columns in descending order
         of width."""
         inked_blocks = []
 
+        columns = self.columns(im)
         first_black_column = -1
         last_black_column = -1
 
-        for index, column in enumerate(self.columns):
+        for index, column in enumerate(columns):
             avg = sum(column)/len(column)
             if avg < 254:
                 if first_black_column == -1:
@@ -98,100 +197,26 @@ class ImageAnalyzer(object):
                     inked_blocks.append((first_black_column, last_black_column,))
                 first_black_column = -1
                 last_black_column = -1
-        return sorted(inked_blocks, reverse=True, key=lambda x: x[1] - x[0])
+        if len(inked_blocks) >= 2:
+            return sorted(sorted(inked_blocks, reverse=True, key=lambda x: x[1] - x[0])[:2], key=lambda x: x[0])
+        else:
+            # something is terribly wrong with this page
+            raise PageCropException('Too few columns')
         
     def graph(self):
         plt.close('all')
         column_avgs = [255 - (sum(column)/len(column)) for column in self.columns]
         plt.plot(xrange(len(self.columns)), column_avgs, 'b-')
         plt.savefig('{}.png'.format(self.image_file_base))
+
 class PageCropException(Exception):
     pass
-
-class PageCropper(object):
-    """ Takes a scanned image of two pages and 
-    crops them into two text areas.
-    """
-    def __init__(self, max_non_white_ctr=20, verbose=False):
-        self.max_non_white_ctr = max_non_white_ctr
-	self.verbose = verbose
-
-    def white_borders(self, pixel_lists, start_index, end_index):
-        borders = []
-        non_white_ctr = 0
-        in_white = False
-        for index, pixel_list in enumerate(pixel_lists):
-            white = sum(pixel_list[start_index:end_index + 1])/(end_index + 1 - start_index) > 245
-            if white and not in_white:
-                in_white = True
-                # first border should be from white to text
-		if borders:
-                    borders.append(index)
-            elif in_white and not white:
-                non_white_ctr += 1
-                if non_white_ctr >= self.max_non_white_ctr:
-                    borders.append(index - non_white_ctr)
-                    in_white = False
-                    non_white_ctr = 0
-            elif in_white and white:
-                non_white_ctr = 0
-        return borders
-    def vertical_white_borders(self, columns):
-        """ Returns array of transitions between white and non-white areas.
-
-        Should result in 6 numbers:
-        last white column before text of page one starts
-        first white column after text of page one ends
-        last white column before fuzzy line between pages
-        first white column after fuzzy line between pages
-        last white column before text of page two starts
-        first white column after text of page two ends
-        """ 
-        return self.white_borders(columns, 0, len(columns[0]) - 1)
-
-    def horizontal_white_borders(self, rows, start_index, end_index):
-        """ Called for each page so fuzzy line between pages not included."""
-        return self.white_borders(rows, start_index, end_index)
-
-    def crop(self, path_to_image, destination_dir):
-        """ Split image into two text areas and save to destiniation dir.
-
-        New images will have same name as original with '-a' and '-b' placed
-        before extension."""
-        im = Image.open(path_to_image)
-        ia = ImageAnalyzer(path_to_image)
-        text_blocks = ia.text_columns()
-        if text_blocks[0][0] < text_blocks[1][0]:
-            page_one_x_start, page_one_x_end = text_blocks[0]
-            page_two_x_start, page_two_x_end = text_blocks[1]
-        else:
-            page_two_x_start, page_two_x_end = text_blocks[0]
-            page_one_x_start, page_one_x_end = text_blocks[1]
-        imagename = os.path.basename(path_to_image)
-        imagename_base, image_ext = os.path.splitext(imagename)
-        # page one 
-        page_one_horizontal_borders = self.horizontal_white_borders(ia.rows, page_one_x_start, page_one_x_end) 
-        page_one_y_start = 0#page_one_horizontal_borders[0]
-        page_one_y_end = im.size[1] #page_one_horizontal_borders[-1]
-        page_one = im.crop((page_one_x_start -5, page_one_y_start, page_one_x_end + 5, page_one_y_end,))
-        page_one.save('{}/{}-a{}'.format(destination_dir, imagename_base, image_ext))
-	if self.verbose:
-            print '{}-a saved'.format(imagename_base)
-        # page two 
-        page_two_horizontal_borders = self.horizontal_white_borders(ia.rows, page_two_x_start, page_two_x_end) 
-        page_two_y_start = 0#page_two_horizontal_borders[0]
-        page_two_y_end = im.size[1] #page_two_horizontal_borders[-1]
-        page_two = im.crop((page_two_x_start - 5, page_two_y_start, page_two_x_end + 5, page_two_y_end,))
-        page_two.save('{}/{}-b{}'.format(destination_dir, imagename_base, image_ext))
-	if self.verbose:
-            print '{}-b saved'.format(imagename_base)
 
 class PdfProcessor(object):
     def __init__(self, verbose=False):
         self.project_path = os.path.abspath('.')
         self.config = ConfigParser()
         self.config.read('book.cnf')
-        self.page_cropper = PageCropper(20, verbose=verbose)
         self.verbose = verbose
 
     def fix(self):
@@ -215,23 +240,19 @@ class PdfProcessor(object):
         self.extract_text_from_pages(lang)
 
     def extract_pages_from_images(self):
-        os.chdir('{}/images/raw'.format(self.project_path))
-        for root, dirs, files in os.walk('.'):
-            destination_dir = '{}/images/cropped/{}'.format(self.project_path, root)
-            os.makedirs(destination_dir)
+        source_dir = '{}/images/raw'.format(self.project_path)
+        destination_dir = '{}/images/cropped'.format(self.project_path)
+        os.makedirs(destination_dir)
+        image_heuristic = ImageHeuristic(verbose=self.verbose)
+        if self.verbose:
+            print 'Starting to extract pages from "{}"'.format(source_dir)
+        for root, dirs, files in os.walk(source_dir):
+            if self.verbose:
+                print 'Adding files from', root
             for f in files:
-                if self.verbose:
-                    print 'extracting pages from {}'.format(f)
-                source_file = '{}/images/raw/{}/{}'.format(self.project_path, root, f)
-                try:
-                    self.page_cropper.crop(source_file, destination_dir)
-                except (PageCropException, IndexError) as e:
-                    if self.verbose:
-                        print ' FAIL', e
-                    if not os.path.exists('fail_crop'):
-                        os.makedirs('fail_crop')
-                    shutil.move(source_file, 'fail_crop')
-        os.chdir(self.project_path)
+                source_file = '{}/{}'.format(root, f)
+                image_heuristic.add_image(source_file)
+        image_heuristic.crop_all(destination_dir)
 
     def setup(self):
         if not os.path.exists(self.destination_dir):
@@ -277,7 +298,7 @@ class PdfProcessor(object):
                 current_page += 1
         os.chdir(self.project_path)
 
-if __name__ == '__main__':
+def run():
     parser = ArgumentParser(description="Converts pdf scans to text")
     parser.add_argument('pdf', type=str, help='Path to PDF')
     parser.add_argument('-d', type=str, dest="dest_dir", default='.',
@@ -295,3 +316,7 @@ if __name__ == '__main__':
         pdf_processer.fix()
     else:
         pdf_processer.process()
+if __name__ == '__main__':
+#   run()
+    ih = ImageHeuristic('.')
+    ih.analyze()

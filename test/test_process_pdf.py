@@ -37,7 +37,7 @@ class PdfProcessorTest(unittest.TestCase):
 
         pdf_processor = process_pdf.PdfProcessor()        
         pdf_processor.extract_pages_from_images()
-        self.assertEqual(8, len([fn for fn in os.listdir('images/cropped/one')]))
+        self.assertEqual(8, len([fn for fn in os.listdir('images/cropped')]))
         shutil.rmtree('images/cropped')
 
     def test_extract_text(self):
@@ -77,19 +77,6 @@ class PdfProcessorTest(unittest.TestCase):
         shutil.rmtree('text')
         shutil.rmtree('images/pages')
 
-    def test_paragraphs(self):
-        os.chdir('{}/test_paragraphs'.format(PATH))
-        expected_line_count = 37
-        paragraph_buffer = 20
-        straight_analyser = process_pdf.ImageAnalyzer('straight.pbm')
-        straight_rows = straight_analyser.text_rows()
-        self.assertEqual(expected_line_count, len(straight_rows))
-        paragraph_rows = [idx_row[0] for  idx_row in enumerate(straight_rows) if idx_row[1][1] > paragraph_buffer]
-        slanted_analyser = process_pdf.ImageAnalyzer('slanted.pbm')
-        slanted_rows = slanted_analyser.text_rows()
-        self.assertEqual(expected_line_count, len(slanted_rows))
-        paragraph_rows = [idx_row[0] for  idx_row in enumerate(slanted_rows) if idx_row[1][1] > paragraph_buffer]
-        self.assertEqual([0, 9, 20, 23, 25, 30, 32, 33, 34, 35,], paragraph_rows)
 
 
 if __name__ == '__main__':
