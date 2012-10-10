@@ -37,7 +37,7 @@ class PdfProcessorTest(unittest.TestCase):
 
         pdf_processor = process_pdf.PdfProcessor()        
         pdf_processor.extract_pages_from_images()
-        self.assertEqual(8, len([fn for fn in os.listdir('images/cropped')]))
+        self.assertEqual(8, len([fn for fn in os.listdir('images/cropped/one')]))
         shutil.rmtree('images/cropped')
 
     def test_extract_text(self):
@@ -48,7 +48,7 @@ class PdfProcessorTest(unittest.TestCase):
         except OSError:
             pass # text already removed
 
-        pdf_processor = process_pdf.PdfProcessor()        
+        pdf_processor = process_pdf.PdfProcessor(False)
         pdf_processor.extract_text_from_pages()
         extracted_list = sorted([fn for fn in os.listdir('text/raw')])
         self.assertEqual(['4.txt', '5.txt', '6.txt', '7.txt',], extracted_list)

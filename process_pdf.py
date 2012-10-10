@@ -40,7 +40,6 @@ class ImageHeuristic(object):
             pages.append(ia.page_b)
         median_width = sorted([page.width for page in pages])[len(pages)/2]
 
-        print median_width
         good_page_a_starts = []
         good_page_a_ends = []
         good_page_b_starts = []
@@ -241,18 +240,20 @@ class PdfProcessor(object):
 
     def extract_pages_from_images(self):
         source_dir = '{}/images/raw'.format(self.project_path)
-        destination_dir = '{}/images/cropped'.format(self.project_path)
-        os.makedirs(destination_dir)
         image_heuristic = ImageHeuristic(verbose=self.verbose)
         if self.verbose:
             print 'Starting to extract pages from "{}"'.format(source_dir)
         for root, dirs, files in os.walk(source_dir):
+            if not files:
+                continue
+            destination_dir = root.replace('/raw/', '/cropped/')
+            os.makedirs(destination_dir)
             if self.verbose:
                 print 'Adding files from', root
             for f in files:
                 source_file = '{}/{}'.format(root, f)
                 image_heuristic.add_image(source_file)
-        image_heuristic.crop_all(destination_dir)
+            image_heuristic.crop_all(destination_dir)
 
     def setup(self):
         if not os.path.exists(self.destination_dir):
@@ -283,7 +284,7 @@ class PdfProcessor(object):
         current_page = self.config.getint('extract_text', 'start_page_number')
         ignores = self.config.get('extract_text', 'ignore_pages').split()
         for root in self.config.get('extract_text', 'ordered_dirnames').split():
-            for f in  sorted(os.listdir(root)):
+            for f in sorted(os.listdir(root)):
                 source_file = '{}/{}'.format(root, f)
                 if source_file in ignores:
                     continue
