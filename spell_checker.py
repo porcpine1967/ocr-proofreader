@@ -246,52 +246,67 @@ class BaseSpellChecker(object):
 #           if not self.check_line(new_word):
 #               self.log_fix('force_hyphen_fix', 'hyphen-at-{}'.format(idx), word, new_word)
 #               return new_word
-        
+    def transformed_variations(self, word):
+        """ Run through the fixer's fixes and return all variations."""
+        print word
+	changed_versions = [(word, '',),]
+        for regex, replace, explanation in self.fixer.letter_fixes:
+            for potential_fix, provided_explanation in changed_versions:
+                # try replace all first
+                new_word, count = regex.subn(replace, potential_fix)
+                # don't bother if nothing changed
+                if count == 0:
+                    continue
+                changed_versions.append((new_word, explanation,))
+                # try replacing one at a time
+                if count > 1:
+                    for match in regex.finditer(potential_fix):
+                        new_word = u'{}{}{}'.format(
+                            potential_fix[:match.start()],
+                            replace,
+                            potential_fix[match.end():]
+                        )
+                        changed_versions.append((new_word, explanation,))
+            changed_versions = list(set(changed_versions))
+                # try replacing between one and all - TODO
+        changed_versions.remove((word, '',))
+        return set(changed_versions)
+
     def fix_spelling(self, word):
         """ Run through the fixer's fixes and return
         a new word if it passes spell check."""
-        
-
-	# sometimes the spell checker does
-	# not return the entire word
-	spell_version = u' '.join(self.check_line(word))
-        # don't fix if it isn't broken
+        # sometimes the spell checker does
+        # not return the entire word
+        spell_version = u' '.join(self.check_line(word))
+         # don't fix if it isn't broken
         if not spell_version:
             return word
-	fixed_versions = []
-        for regex, replace, explanation in self.fixer.letter_fixes:
+        
+        changed_versions = self.transformed_variations(spell_version)
 
-            # try replace all first
-            new_word, count = regex.subn(replace, spell_version)
-            # don't bother if nothing changed
-            if count == 0:
-                continue
-            fixed_versions.append((new_word, explanation,))
-            # try replacing one at a time
-            if count > 1:
-                for match in regex.finditer(spell_version):
-                    new_word = u'{}{}{}'.format(
-                        spell_version[:match.start()],
-                        replace,
-                        spell_version[match.end():]
-                    )
-                    fixed_versions.append((new_word, explanation,))
-            # try replacing between one and all - TODO
-	if fixed_versions:
-            fixed_words = [t[0] for t in fixed_versions]
-            bad_versions = [_decode(v) for v in self.check_line(' '.join(fixed_words))]
-            good_versions = [item for item in fixed_words if item not in bad_versions]
-        else:
-            good_versions = []
+        good_versions = []
+	if changed_versions:
+            changed_words = [t[0] for t in changed_versions]
+            # aspell maintains order of bad words, but does not return good words
+            # we therefore need some way to indicate that nothing was returned
+            # (that is the word was good) in a given area.  This is notede by
+            # a repetition of xNoTPassx
+            # We then split on that, which leaves empty strings in the space
+            # that have good words (which fail a boolean test in python)
+            failed_versions = [_decode(v) for v in self.check_line(u' xNoTPassx '.join(changed_words))]
+            words_if_bad = ''.join(failed_versions).split(u'xNoTPassx')
+            for idx, w in enumerate(changed_words):
+                if not words_if_bad[idx]:
+                    good_versions.append(w)
         if good_versions:
-            explanation = [t[1] for t in fixed_versions if t[0] == good_versions[0]][0]
+            explanation = [t[1] for t in changed_versions if t[0] == good_versions[0]][0]
             self.log_fix('spell_fix', explanation, spell_version, good_versions[0])
             return word.replace(spell_version, good_versions[0])
         else:
             # give up - cannot fix
             return word
 
-    def odd_orthography(self, word1, word2):
+    def odd_orthography(self, line):
         """ Returns True if the orthography is a little weird."""
          
 

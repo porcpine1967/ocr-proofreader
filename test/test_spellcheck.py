@@ -56,5 +56,31 @@ class SpellCheckTester(unittest.TestCase):
         ])
         for test, expected in test_expected('{}/test_spellcheck/hyphenate'.format(PATH)):
             self.assertEqual(sc.hyphenate(test), expected)
+
+    def test_line_transformations(self):
+        """ Test
+            XO-to-Xo
+            5-to-s
+            m-to-rn
+            1-to-i
+            e-to-c
+            1-to-l
+            rn-to-m
+            cl-to-d
+            0-to-o
+            ck-to-d
+            VV-to-W
+            u"lll-to-'ll"
+            xX-to-x[space]X
+            oo-to-co
+            n-tilde-to-fi
+        """
+        sc = spell_checker.StubSpellChecker([])
+
+        # check simple
+        self.assertEqual(set(((u'bus', '5-to-s',),)), sc.transformed_variations('bu5'))
+        # check double
+        expected = set([(u'bums', u'5-to-s'), ('burn5', u'm-to-rn'), ('bum5', u'rn-to-m'), (u'burns', u'5-to-s')])
+        print sc.transformed_variations('burn5')
 if __name__ == '__main__':
     unittest.main()

@@ -105,85 +105,107 @@ class LineManager(object):
         except ZeroDivisionError:
             return 0
 
-    def interactive_fix(self):
-        replaceable = (re.compile(u'({}+)["\u00B0]+({}+)'.format(REGEX_LETTER, REGEX_LETTER), flags=re.UNICODE), r"\1'\2")
-        page_viewed = False
+    def next_line_to_check(self, start_page_nbr, start_line):
+        """ Takes a page number and line and returns the next 
+            page_nbr and line that should be checked.
+
+        Starts at beginning if page or line blank."""
+        found = not bool(start_page_nbr and start_line)
         for page_nbr in self.page_numbers:
-            if int(page_nbr) < self.start_page:
+            if int(page_nbr) < int(start_page_nbr):
                 continue
             lines = self.pages[page_nbr]
-            for idx, line in enumerate(lines):
-                to_check = line.should_check()
-                if to_check:
-                    if not page_viewed:
-                        os.system('gnome-open images/pages/{}.pbm'.format(page_nbr))
-                        page_viewed = True
-                    print '\n\n\n\n\n'
-                    print 'Something odd on page {} line {}'.format(page_nbr, line.line_nbr)
-                    try:
-                        print u'*** {}'.format(lines[idx-1].text)
-                    except IndexError:
-                        pass
-                    print line.text
-                    try:
-                        print u'*** {}'.format(lines[idx+1].text)
-                    except IndexError:
-                        pass
-                    print u' | '.join([w.text for w in to_check])
-                    sys.stdout.write('(m)ark, (i)gnore, (q)uit >')
-                    action = raw_input()
-                    if action.startswith('q'):
-                        self.end_page = page_nbr
-                        return
-                    elif action.startswith('m'):
-                        fix = raw_input()
-                        if fix:
-                            line.manual_fix = fix
-                        else:
-                            line.manual_fix = '(no text)'
-                    elif not action.startswith('i'):
-                        for word in to_check:
-                            print '\n\n'
-                            print word.text
-                            if word.misspelled:
-                                replacement = raw_input()
-                                if replacement:
-                                    if replacement == 'atd':
-                                        self.spell_checker.add_word(word.text)
-                                    else:
-                                        word.text = replacement.decode('utf-8')
-                                        word.misspelled = False
-                            elif word.odd_punctuation:
-                                replace = True
-				m = replaceable[0].search(word.text)
-                                if m:
-                                    sys.stdout.write('(e)dit or (r)eplace with apostrophe >')
-                                    decision = raw_input()
-                                    if not decision.startswith('e'):
-                                        replace = False
-                                    if decision.startswith('r'):
-                                        word.text = replaceable[0].sub(replaceable[1], word.text)
-                                if replace:
-                                    replacement = raw_input()
-                                    if replacement:
-                                        word.text = replacement.decode('utf-8')
-                                        word.misspelled = False
-                            elif word.hyphenated:
-                                sys.stdout.write('(a)dd space, (j)oin words, (e)dit, (r)eplace hyphen >')
-                                replacement = raw_input()
-                                if replacement == 'a':
-                                    word.text = word.text.replace('-', ' - ').strip()
-                                elif replacement == 'j':
-                                    word.text = re.sub(' *- *', '', word.text)
-                                elif replacement == 'r':
-                                    replacement_2 = raw_input()
-                                    if replacement_2:
-                                        word.text = word.text.replace('-', replacement_2)
-                                elif replacement == 'e':
-                                    replacement = raw_input()
-                                    if replacement:
-                                        word.text = replacement.decode('utf-8')
-                    line.rebuild()
+            for line in lines:
+                if found and line.should_check():
+                    return page_nbr, line
+                elif line == start_line:
+                    found = True
+        return '0', None
+
+    def line_context(self, page_nbr, check_line):
+        """ Returns text of lines above and below."""
+        before_line = '[PAGE BEGIN]'
+        after_line = '[PAGE END]'
+        lines = self.pages[page_nbr]
+        try:
+            idx = lines.index(check_line)
+            if idx > 0:
+                before_line = lines[idx-1].text
+            try:
+                after_line = lines[idx+1].text
+            except IndexError:
+                pass
+        except ValueError:
+            pass
+        return before_line, after_line
+
+    def interactive_fix(self):
+        replaceable = (re.compile(u'({}+)["\u00B0]+({}+)'.format(REGEX_LETTER, REGEX_LETTER), flags=re.UNICODE), r"\1'\2")
+        page_nbr, line = self.next_line_to_check(self.start_page, None)
+        while line:
+            to_check = line.should_check()
+            before_line, after_line = self.line_context(page_nbr, line)
+            print '\n\n\n\n\n'
+            print 'Something odd on page {} line {}'.format(page_nbr, line.line_nbr)
+            print u'*** {}'.format(before_line)
+            print line.text
+            print u'*** {}'.format(after_line)
+            print u' | '.join([w.text for w in to_check])
+            sys.stdout.write('(m)ark, (i)gnore, (q)uit >')
+            action = raw_input()
+            if action.startswith('q'):
+                self.end_page = page_nbr
+                return
+            elif action.startswith('m'):
+                fix = raw_input()
+                if fix:
+                    line.manual_fix = fix
+                else:
+                    line.manual_fix = '(no text)'
+            elif not action.startswith('i'):
+                for word in to_check:
+                    print '\n\n'
+                    print word.text
+                    if word.misspelled:
+                        replacement = raw_input()
+                        if replacement:
+                            if replacement == 'atd':
+                                self.spell_checker.add_word(word.text)
+                            else:
+                                word.text = replacement.decode('utf-8')
+                                word.misspelled = False
+                    elif word.odd_punctuation:
+                        replace = True
+                        m = replaceable[0].search(word.text)
+                        if m:
+                            sys.stdout.write('(e)dit or (r)eplace with apostrophe >')
+                            decision = raw_input()
+                            if not decision.startswith('e'):
+                                replace = False
+                            if decision.startswith('r'):
+                                word.text = replaceable[0].sub(replaceable[1], word.text)
+                        if replace:
+                            replacement = raw_input()
+                            if replacement:
+                                word.text = replacement.decode('utf-8')
+                                word.misspelled = False
+                    elif word.hyphenated:
+                        sys.stdout.write('(a)dd space, (j)oin words, (e)dit, (r)eplace hyphen >')
+                        replacement = raw_input()
+                        if replacement == 'a':
+                            word.text = word.text.replace('-', ' - ').strip()
+                        elif replacement == 'j':
+                            word.text = re.sub(' *- *', '', word.text)
+                        elif replacement == 'r':
+                            replacement_2 = raw_input()
+                            if replacement_2:
+                                word.text = word.text.replace('-', replacement_2)
+                        elif replacement == 'e':
+                            replacement = raw_input()
+                            if replacement:
+                                word.text = replacement.decode('utf-8')
+            line.rebuild()
+            page_nbr, line = self.next_line_to_check(self.start_page, line)
 
     def write_html(self, book_config):
 	self.calculate_average_length()

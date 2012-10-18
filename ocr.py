@@ -12,6 +12,51 @@ import controller
 import process_pdf 
 import line_manager
 import spell_checker
+import gui
+
+def test():
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    bad_words = set()
+    for fn in os.listdir('text/clean'):
+        if fn.endswith('.txt'):
+            for bad_word in checker.check_document('text/clean/{}'.format(fn)):
+                bad_words.add(spell_checker._decode(bad_word))
+    fixes = []
+    for bad_word in bad_words:
+        changed_versions = checker.transformed_variations(bad_word)
+        good_versions = []
+        if changed_versions:
+            changed_words = [t[0] for t in changed_versions]
+            with codecs.open('hold_words.txt', mode='wb', encoding='utf-8') as f:
+                f.write(u' xNoTPassx '.join(changed_words))
+            # aspell maintains order of bad words, but does not return good words
+            # we therefore need some way to indicate that nothing was returned
+            # (that is the word was good) in a given area.  This is notede by
+            # a repetition of xNoTPassx
+            # We then split on that, which leaves empty strings in the space
+            # that have good words (which fail a boolean test in python)
+            failed_versions = checker.check_document('hold_words.txt')
+            words_if_bad = u''.join([spell_checker._decode(w) for w in failed_versions]).split(u'xNoTPassx')
+            for idx, w in enumerate(changed_words):
+                if not words_if_bad[idx]:
+                    good_versions.append(spell_checker._decode(w))
+            if good_versions:
+                fixes.append((bad_word, good_versions,)) 
+    with codecs.open('fixed_spells.txt', mode='wb', encoding='utf-8') as f:
+        for bad_word, good_versions in fixes:
+                f.write(u'{:20}: {}\n'.format(bad_word, u'|'.join(good_versions)))
+def run_gui(start_page, end_page):
+    """ Batch cleans the pages in text/clean."""
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
+        start_page,
+        end_page
+        )
+    lm.load('text/clean')
+    gui.main(lm)
 
 def new():
     """ Create/update config, dictionary, and file structure."""
@@ -275,6 +320,8 @@ def run():
         'clean': 'c',
         'fix': 'f',
         'html': 'h',
+        'gui': 'g',
+        'test': 't',
     }
     parser = ArgumentParser(
         description="Tool for converting images of books into corrected text"
@@ -336,6 +383,14 @@ def run():
         aspell_run(args.start, end_page)
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'
+    elif args.action in ('gui', 'g'):
+        if args.end == 0:
+            end_page = args.start + args.interval - 1
+        else:
+            end_page = args.end
+        run_gui(args.start, end_page)
+    else:
+        test()
 #   process_pdfs()
 #   show_headers()
 #   test_garbage()

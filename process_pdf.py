@@ -240,12 +240,12 @@ class PdfProcessor(object):
 
     def extract_pages_from_images(self):
         source_dir = '{}/images/raw'.format(self.project_path)
-        image_heuristic = ImageHeuristic(verbose=self.verbose)
         if self.verbose:
             print 'Starting to extract pages from "{}"'.format(source_dir)
         for root, dirs, files in os.walk(source_dir):
             if not files:
                 continue
+            image_heuristic = ImageHeuristic(verbose=self.verbose)
             destination_dir = root.replace('/raw/', '/cropped/')
             os.makedirs(destination_dir)
             if self.verbose:
