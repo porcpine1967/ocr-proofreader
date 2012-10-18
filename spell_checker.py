@@ -248,7 +248,6 @@ class BaseSpellChecker(object):
 #               return new_word
     def transformed_variations(self, word):
         """ Run through the fixer's fixes and return all variations."""
-        print word
 	changed_versions = [(word, '',),]
         for regex, replace, explanation in self.fixer.letter_fixes:
             for potential_fix, provided_explanation in changed_versions:

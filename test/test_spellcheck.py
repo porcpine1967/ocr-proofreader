@@ -81,6 +81,6 @@ class SpellCheckTester(unittest.TestCase):
         self.assertEqual(set(((u'bus', '5-to-s',),)), sc.transformed_variations('bu5'))
         # check double
         expected = set([(u'bums', u'5-to-s'), ('burn5', u'm-to-rn'), ('bum5', u'rn-to-m'), (u'burns', u'5-to-s')])
-        print sc.transformed_variations('burn5')
+        self.assertEqual(expected, sc.transformed_variations('burn5'))
 if __name__ == '__main__':
     unittest.main()
