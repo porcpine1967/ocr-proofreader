@@ -34,6 +34,7 @@ class LineManager(object):
         self.page_numbers = []
         self.pages = {}
         self.average_length = 0
+        self.average_lines_per_page = 0
         self.spell_checker = spell_checker
         self.start_page = start_page
         self.end_page = end_page
@@ -88,6 +89,7 @@ class LineManager(object):
                     self.pages[basename].append(line)
                     idx += 1
         self.average_length = self.calculate_average_length()
+        self.average_lines_per_page = sum([len(lines) for lines in self.pages.values()])/len(self.pages)
         self.page_numbers = sorted(self.pages.keys(), key=lambda x: int(x))
 
     def calculate_average_length(self):
@@ -105,6 +107,35 @@ class LineManager(object):
         except ZeroDivisionError:
             return 0
 
+    def previous_line(self, start_page_nbr, start_line):
+        hold_line = None
+        lines = self.pages[start_page_nbr]
+        for line in lines:
+            if line == start_line:
+                if hold_line:
+                    return start_page_nbr, hold_line
+                elif self.pages.has_key(str(int(start_page_nbr) - 1)):
+                    page_nbr = str(int(start_page_nbr) - 1)
+                    return page_nbr, self.pages[page_nbr][-1]
+                else:
+                    return start_page_nbr, start_line
+            else:
+                hold_line = line
+        return start_page_nbr, start_line
+        
+    def next_line(self, start_page_nbr, start_line):
+        found = not bool(start_page_nbr and start_line)
+        for page_nbr in self.page_numbers:
+            if int(page_nbr) < int(start_page_nbr):
+                continue
+            lines = self.pages[page_nbr]
+            for line in lines:
+                if found:
+                    return page_nbr, line
+                elif line == start_line:
+                    found = True
+        return '0', None
+        
     def next_line_to_check(self, start_page_nbr, start_line):
         """ Takes a page number and line and returns the next 
             page_nbr and line that should be checked.
@@ -316,6 +347,12 @@ class Line(object):
             elif False and word.hyphenated and len(word.text) > 1:
                 to_check.append(word)
         return to_check
+
+    def set_text(self, text):
+        self.text = text
+        self._built = False
+        self.words = []
+        self.rebuild()
 
     def rebuild(self):
         self.build_words()

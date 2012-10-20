@@ -57,7 +57,7 @@ def run_gui(start_page, end_page):
         )
     lm.load('text/clean')
     gui.main(lm)
-
+    lm.write_pages('text/clean', False)
 def new():
     """ Create/update config, dictionary, and file structure."""
     # Set up pdfs

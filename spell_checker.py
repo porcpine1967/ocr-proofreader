@@ -248,27 +248,27 @@ class BaseSpellChecker(object):
 #               return new_word
     def transformed_variations(self, word):
         """ Run through the fixer's fixes and return all variations."""
-	changed_versions = [(word, '',),]
+	changed_versions = [(word, '', ''),]
         for regex, replace, explanation in self.fixer.letter_fixes:
-            for potential_fix, provided_explanation in changed_versions:
+            for potential_fix, old_word, provided_explanation in changed_versions:
                 # try replace all first
                 new_word, count = regex.subn(replace, potential_fix)
                 # don't bother if nothing changed
                 if count == 0:
                     continue
-                changed_versions.append((new_word, explanation,))
+                changed_versions.append((new_word, potential_fix, explanation,))
                 # try replacing one at a time
-                if count > 1:
+                if count > 1: # and u'\\' not in replace:
                     for match in regex.finditer(potential_fix):
                         new_word = u'{}{}{}'.format(
                             potential_fix[:match.start()],
-                            replace,
+                            regex.sub(replace, potential_fix[match.start():match.end()]),
                             potential_fix[match.end():]
                         )
-                        changed_versions.append((new_word, explanation,))
+                        changed_versions.append((new_word, potential_fix, explanation,))
             changed_versions = list(set(changed_versions))
                 # try replacing between one and all - TODO
-        changed_versions.remove((word, '',))
+        changed_versions.remove((word, '', ''))
         return set(changed_versions)
 
     def fix_spelling(self, word):
