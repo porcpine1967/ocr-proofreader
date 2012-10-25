@@ -502,7 +502,7 @@ class Word(object):
         word: another Word object
 
         Rules:
-        If the text of this word is a lower case letter
+        If the beginning of this word is a lower case letter
         AND
         Both words are spelled correctly
         AND
@@ -511,7 +511,7 @@ class Word(object):
         it will join the two as a hyphenate
 
         IF
-        the text of this word is lower case
+        the beginning of this word is lower case
         AND
         One of the words is misspelled
         AND

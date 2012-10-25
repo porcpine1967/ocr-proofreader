@@ -260,12 +260,12 @@ class BaseSpellChecker(object):
                 # try replacing one at a time
                 if count > 1: # and u'\\' not in replace:
                     for match in regex.finditer(potential_fix):
-                        new_word = u'{}{}{}'.format(
+                        new_word_2 = u'{}{}{}'.format(
                             potential_fix[:match.start()],
-                            regex.sub(replace, potential_fix[match.start():match.end()]),
+                            new_word[match.start():match.end()],
                             potential_fix[match.end():]
                         )
-                        changed_versions.append((new_word, potential_fix, explanation,))
+                        changed_versions.append((new_word_2, potential_fix, explanation,))
             changed_versions = list(set(changed_versions))
                 # try replacing between one and all - TODO
         changed_versions.remove((word, '', ''))

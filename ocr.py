@@ -10,43 +10,32 @@ import sys
 
 import controller
 import process_pdf 
+import document_builder
 import line_manager
 import spell_checker
 import gui
 
 def test():
+    """ Whatever is being worked on."""
+    """ Currently, either proper nouns or cross-line fixes."""
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
     checker = spell_checker.AspellSpellChecker(lang, dict_)
-    bad_words = set()
-    for fn in os.listdir('text/clean'):
-        if fn.endswith('.txt'):
-            for bad_word in checker.check_document('text/clean/{}'.format(fn)):
-                bad_words.add(spell_checker._decode(bad_word))
-    fixes = []
-    for bad_word in bad_words:
-        changed_versions = checker.transformed_variations(bad_word)
-        good_versions = []
-        if changed_versions:
-            changed_words = [t[0] for t in changed_versions]
-            with codecs.open('hold_words.txt', mode='wb', encoding='utf-8') as f:
-                f.write(u' xNoTPassx '.join(changed_words))
-            # aspell maintains order of bad words, but does not return good words
-            # we therefore need some way to indicate that nothing was returned
-            # (that is the word was good) in a given area.  This is notede by
-            # a repetition of xNoTPassx
-            # We then split on that, which leaves empty strings in the space
-            # that have good words (which fail a boolean test in python)
-            failed_versions = checker.check_document('hold_words.txt')
-            words_if_bad = u''.join([spell_checker._decode(w) for w in failed_versions]).split(u'xNoTPassx')
-            for idx, w in enumerate(changed_words):
-                if not words_if_bad[idx]:
-                    good_versions.append(spell_checker._decode(w))
-            if good_versions:
-                fixes.append((bad_word, good_versions,)) 
-    with codecs.open('fixed_spells.txt', mode='wb', encoding='utf-8') as f:
-        for bad_word, good_versions in fixes:
-                f.write(u'{:20}: {}\n'.format(bad_word, u'|'.join(good_versions)))
+    db = document_builder.SpellcheckDocMaker(checker)
+#   db.make_line_join_doc('text/clean')
+    db.make_line_join_doc('test')
+
+def fix_spells():
+    """ Runs through the document, finds all the bad words, then 
+    tries to find fixed versions of them.
+    """
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.make_word_fix_doc('test')
+#   db.make_word_fix_doc('text/clean')
 def run_gui(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
     lang = get_lang()
@@ -321,6 +310,7 @@ def run():
         'fix': 'f',
         'html': 'h',
         'gui': 'g',
+        'fix_spells': 'fs',
         'test': 't',
     }
     parser = ArgumentParser(
@@ -381,6 +371,8 @@ def run():
         else:
             end_page = args.end
         aspell_run(args.start, end_page)
+    elif args.action in ('fix_spells', 'ft',):
+        fix_spells()
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'
     elif args.action in ('gui', 'g'):
