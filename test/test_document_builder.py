@@ -46,13 +46,13 @@ class DocumentBuilderTester(unittest.TestCase):
                                         '{}/test_paragraphs/text/straight.txt'.format(PATH))
         page_lines = pi.line_guess()
         self.assertEquals(len(pi.lines), len(page_lines))
+
         pi = document_builder.PageInfo('{}/test_paragraphs/images/slanted.pbm'.format(PATH),
                                         '{}/test_paragraphs/text/slanted.txt'.format(PATH))
         page_lines = pi.line_guess()
-        im = Image.open(pi.path_to_image)
-        width, height = im.size
-        for idx, line in enumerate(page_lines):
-            
-            image_page_b = im.crop((0, line.y, width, line.y + line.height))
-            image_page_b.save('/var/tmp/lines/slanted_{}.pbm'.format(idx))
+        self.assertEquals(len(pi.lines), len(page_lines))
+
+        pi = document_builder.PageInfo('{}/test_paragraphs/images/maigret.pbm'.format(PATH),
+                                        '{}/test_paragraphs/text/maigret.txt'.format(PATH))
+        page_lines = pi.line_guess()
         self.assertEquals(len(pi.lines), len(page_lines))

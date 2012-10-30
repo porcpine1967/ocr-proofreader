@@ -133,7 +133,7 @@ class SpellcheckDocMaker(object):
                     f.write(u' xNoTPassx '.join(changed_words))
                 # aspell maintains order of bad words, but does not return good words
                 # we therefore need some way to indicate that nothing was returned
-                # (that is the word was good) in a given area.  This is notede by
+                # (that is the word was good) in a given area.  This is noted by
                 # a repetition of xNoTPassx
                 # We then split on that, which leaves empty strings in the space
                 # that have good words (which fail a boolean test in python)
@@ -184,31 +184,21 @@ class PageInfo(object):
     def load_image_data(self):
         self.pixel_lines = []
         im = Image.open(self.path_to_image)
-        width, height = im.size
+        self.width, height = im.size
         current_row = []
         for pixel in im.getdata():
             current_row.append(pixel)
-            if not len(current_row) % width:
+            if not len(current_row) % self.width:
                 self.pixel_lines.append(PixelLineInfo(current_row))
                 current_row = []
 
-    def chop_by_blank(self, _left_margin_correction=0):
-        """ Divide lines by blanks."""
-        lines = []
-        current_line = LineInfo(0)
-        for idx, pixel_line in enumerate(self.pixel_lines):
-            current_line.add_pixel_line(pixel_line)
-            if pixel_line.blank:
-                if not current_line.blank():
-                    lines.append(current_line)
-                current_line = LineInfo(idx)
-        return lines
-
-    def chop_by_leap_forward(self, minimum_leap, minimum_height):
+    def chop_by_leap_forward(self, minimum_leap, minimum_height, header_offset):
         lines = []
         current_line = LineInfo(0)
         last_left_margin = None
         for idx, pixel_line in enumerate(self.pixel_lines):
+            if idx < header_offset:
+                continue
             if not last_left_margin:
                 check_line = False
             else:
@@ -222,52 +212,33 @@ class PageInfo(object):
             current_line.add_pixel_line(pixel_line)
         return lines
 
-    def chop_by_left_margin(self, left_margin_pct=0.5):
-        """ Divide line by left margin.
+    def line_guess(self, header_offset=0):
+        """ Tries to guess where the lines of text in the image are.
 
-        left_margin_pct is how deep to go before you 
-        decide that the line is blank.
-        """ 
+        header_offset: if there is gunk at the beginning
+        you don't want to count."""
         lines = []
-        current_line = LineInfo(0)
-        for idx, pixel_line in enumerate(self.pixel_lines):
-            current_line.add_pixel_line(pixel_line)
-            if pixel_line.blank_to(left_margin_pct):
-                if len(current_line.pixel_lines) > 1:
-                    lines.append(current_line)
-                current_line = LineInfo(idx)
+        minimum_jump = self.width
+        minimum_height = 1
+        while len(lines) != len(self.lines) and 0 < minimum_jump:
+            lines = self.chop_by_leap_forward(minimum_jump, minimum_height, header_offset)
+            # minimum height is 20% of average
+            minimum_height = sum([line.height for line in lines])/(len(lines)*5)
+            minimum_jump -= 10
         return lines
 
-    def line_guess(self, lines=None):
-        """ Returns array of line objects with same count as
-        number of text lines.
+
+    def chopped_version(self, output_file_path, header_offset=0):
+        """ Outputs one file per line.
+
+        output_file_path should have a {} to hold
+        the line index.
         """
-        if not lines:
-            lines = self.chop_by_blank()
-        if len(lines) > len(self.lines):
-            line_heights = [l.height for l in lines]
-            average_line_height = sum(line_heights) / len(lines)
-            x = 0
-            while len(lines) > len(self.lines):
-                x += .01
-                lines_to_remove = []
-                for line in lines:
-                    if float(line.height)/average_line_height < x:
-                        lines_to_remove.append(line)
-                for line in lines_to_remove:
-                    lines.remove(line)
-        elif len(lines) < len(self.lines):
-            minimum_jump = lines[0].width
-            minimum_height = 1
-            while len(lines) < len(self.lines) and 0 < minimum_jump:
-                lines = self.chop_by_leap_forward(minimum_jump, minimum_height)
-                minimum_height = sum([line.height for line in lines])/(len(lines)*5)
-                minimum_jump -= 10
-#           return self.line_guess(lines)
-        return lines
-
-    def chopped_version(self):
-        pass
+        im = Image.open(self.path_to_image)
+        width, height = im.size
+        for idx, line in enumerate(self.line_guess(header_offset)):
+            image_page_b = im.crop((0, line.y, width, line.y + line.height))
+            image_page_b.save(output_file_path.format(idx))
             
 class LineInfo(object):
     def __init__(self, y):
@@ -304,10 +275,3 @@ class PixelLineInfo(object):
             self.blank = True
         self.density = float(data.count(0))/self.full_length
 
-    def blank_to(self, idx):
-        """ Whether it is blank from 0 to idx. """
-        if idx < 1: 
-            # assume pct
-            idx = int(self.full_length * idx)
-        
-        return self.left_margin > idx
