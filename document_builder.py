@@ -1,23 +1,66 @@
 #!/usr/bin/env python
 """ This module creates useful documents for cleaning."""
 
+from collections import Counter
 import codecs
+import Image
 import os
 import re
+import sys
 
 import spell_checker
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
 begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
-ends_with_lowercase = re.compile(u'{}$'.format(REGEX_SMALL), re.UNICODE).match
+ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
+punctuation_stripper = re.compile(u'.*?({}.*{}).*'.format(REGEX_LETTER, REGEX_LETTER), re.UNICODE).match
 
 class SpellcheckDocMaker(object):
     """ Creates documents that can later be used for spell checking."""
-    def __init__(self, spell_checker, output_dir='working'):
+    def __init__(self, spell_checker, output_dir='working', delimiter='|'):
         self.spell_checker = spell_checker
         self.output_dir = output_dir
+        self.delimiter = delimiter
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+
+    def letters(self, word):
+        """ Returns the word with for-and-aft punctuation stripped."""
+        m = punctuation_stripper(word)
+        if m:
+            return m.group(1)
+        else:
+            return word
+    def possible_headers(self, dir_):
+        headers = {}
+        for fn in os.listdir(dir_):
+            if fn.endswith('.txt'):
+                with codecs.open('{}/{}'.format(dir_, fn), mode='r', encoding='utf-8') as f:
+                    for l in f:
+                        if len(l.strip()) > 5:
+                            headers[fn] = l.strip()
+                            break
+        with codecs.open('{}/headers.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
+            for page, header in sorted(headers.items(), key=lambda x: int(x[0][:-4])):
+                f.write(u'{}|{}\n'.format(page, header))
+
+    def make_possible_proper_name_doc(self, dir_):
+        proper_nouns = set()
+        hold_word = ''
+        for fn in os.listdir(dir_):
+            if fn.endswith('.txt'):
+                with codecs.open('{}/{}'.format(dir_, fn), mode='r', encoding='utf-8') as f:
+                    for l in f:
+                        words = l.split()
+                        if len(words): # ignore blank lines
+                            for word in words:
+                                if self.spell_checker.proper_noun(hold_word, word):
+                                    proper_nouns.add(self.letters(word))
+                                hold_word = word
+        with codecs.open('{}/possible_proper_nouns.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
+            for proper_noun in proper_nouns:
+                f.write(u'{}\n'.format(proper_noun))
+        
     def make_word_fix_doc(self, dir_):
         checker = self.spell_checker
         bad_words = set()
@@ -27,15 +70,15 @@ class SpellcheckDocMaker(object):
                     bad_words.add(spell_checker._decode(bad_word))
         fixes = self.fixed_words(bad_words)
         with codecs.open('{}/word_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for bad_word, good_version in fixes.items():
-                f.write(u'{}|{}\n'.format(bad_word, good_version))
+            for bad_word, good_versions in fixes.items():
+                f.write(u'{}|{}\n'.format(bad_word, self.delimiter.join(good_versions)))
 
     def make_line_join_doc(self, dir_):
         """Creates a document of fixes for cross-line joining.
         Uses all the documents found in dir_
         Writes to 'hyphen_fixes' in current directory
         with the format:
-        joinedwords|comma-separated-fixes
+        joinedwords|delimiter-separated-fixes
         """
         checker = self.spell_checker
         fixes = set()
@@ -46,7 +89,8 @@ class SpellcheckDocMaker(object):
                     for l in f:
                         words = l.split()
                         if len(words): # ignore blank lines
-                            fixes.update(self.checkables(hold_word, words[0]))
+                            fixes.update(self.joinables(hold_word, words[0]))
+                            # blank out the hold word if only one word in line
                             if len(words) > 1:
                                 hold_word = words[-1]
                             else:
@@ -69,8 +113,8 @@ class SpellcheckDocMaker(object):
         for bad_word, good_change in self.fixed_words(bad_words).items():
             good_changes[bad_word] = good_change
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for bad_word, good_version in good_changes.items():
-                    f.write(u'{}|{}\n'.format(bad_word, good_version))
+            for bad_word, good_versions in good_changes.items():
+                    f.write(u'{}|{}\n'.format(bad_word, self.delimiter.join(good_versions)))
 
     def fixed_words(self, bad_words):
         """ Takes a list of bad words and returns a dictionary of the 
@@ -98,15 +142,18 @@ class SpellcheckDocMaker(object):
                 for idx, w in enumerate(changed_words):
                     if not words_if_bad[idx]:
                         good_versions.append(spell_checker._decode(w))
-                if len(good_versions) == 1:
-                    good_changes[bad_word] = good_versions[0]
+                if good_versions:
+                    good_changes[bad_word] = good_versions
+                    
         return good_changes
-    def checkables(self, first_word, second_word):
+
+    def joinables(self, first_word, second_word):
         """ Sees if it would be worth while joining the word.
 
         returns an array of words to check.
         """
         words_to_check = []
+        
         if begins_with_lowercase(second_word) \
             and len(first_word) > 2 \
             and len(second_word) > 2:
@@ -115,3 +162,152 @@ class SpellcheckDocMaker(object):
             words_to_check.append(first_word[:-1] + second_word)
         return words_to_check
         
+    def page_image_info(self, dir_):
+        pass
+
+class PageInfo(object):
+    """ Maps an image to its text."""
+    def __init__(self, path_to_image, path_to_text):
+        self.path_to_image = path_to_image
+        self.path_to_text = path_to_text
+        self.load_text_data()
+        self.load_image_data()
+
+    def load_text_data(self):
+        self.lines = []
+        with codecs.open(self.path_to_text, mode='rb', encoding='utf-8') as f:
+            for l in f:
+                line = l.strip()
+                if line:
+                    self.lines.append(l)
+
+    def load_image_data(self):
+        self.pixel_lines = []
+        im = Image.open(self.path_to_image)
+        width, height = im.size
+        current_row = []
+        for pixel in im.getdata():
+            current_row.append(pixel)
+            if not len(current_row) % width:
+                self.pixel_lines.append(PixelLineInfo(current_row))
+                current_row = []
+
+    def chop_by_blank(self, _left_margin_correction=0):
+        """ Divide lines by blanks."""
+        lines = []
+        current_line = LineInfo(0)
+        for idx, pixel_line in enumerate(self.pixel_lines):
+            current_line.add_pixel_line(pixel_line)
+            if pixel_line.blank:
+                if not current_line.blank():
+                    lines.append(current_line)
+                current_line = LineInfo(idx)
+        return lines
+
+    def chop_by_leap_forward(self, minimum_leap, minimum_height):
+        lines = []
+        current_line = LineInfo(0)
+        last_left_margin = None
+        for idx, pixel_line in enumerate(self.pixel_lines):
+            if not last_left_margin:
+                check_line = False
+            else:
+                leap = last_left_margin - pixel_line.left_margin > minimum_leap
+                check_line = leap or pixel_line.blank
+            last_left_margin = pixel_line.left_margin
+            if check_line:
+                if len(current_line.pixel_lines) > minimum_height:
+                    lines.append(current_line)
+                current_line = LineInfo(idx)
+            current_line.add_pixel_line(pixel_line)
+        return lines
+
+    def chop_by_left_margin(self, left_margin_pct=0.5):
+        """ Divide line by left margin.
+
+        left_margin_pct is how deep to go before you 
+        decide that the line is blank.
+        """ 
+        lines = []
+        current_line = LineInfo(0)
+        for idx, pixel_line in enumerate(self.pixel_lines):
+            current_line.add_pixel_line(pixel_line)
+            if pixel_line.blank_to(left_margin_pct):
+                if len(current_line.pixel_lines) > 1:
+                    lines.append(current_line)
+                current_line = LineInfo(idx)
+        return lines
+
+    def line_guess(self, lines=None):
+        """ Returns array of line objects with same count as
+        number of text lines.
+        """
+        if not lines:
+            lines = self.chop_by_blank()
+        if len(lines) > len(self.lines):
+            line_heights = [l.height for l in lines]
+            average_line_height = sum(line_heights) / len(lines)
+            x = 0
+            while len(lines) > len(self.lines):
+                x += .01
+                lines_to_remove = []
+                for line in lines:
+                    if float(line.height)/average_line_height < x:
+                        lines_to_remove.append(line)
+                for line in lines_to_remove:
+                    lines.remove(line)
+        elif len(lines) < len(self.lines):
+            minimum_jump = lines[0].width
+            minimum_height = 1
+            while len(lines) < len(self.lines) and 0 < minimum_jump:
+                lines = self.chop_by_leap_forward(minimum_jump, minimum_height)
+                minimum_height = sum([line.height for line in lines])/(len(lines)*5)
+                minimum_jump -= 10
+#           return self.line_guess(lines)
+        return lines
+
+    def chopped_version(self):
+        pass
+            
+class LineInfo(object):
+    def __init__(self, y):
+        self.pixel_lines = []
+        self.height = 0
+        self.left_margin = None
+        self.y = y
+        self.width = None
+
+    def add_pixel_line(self, pixel_line):
+        self.pixel_lines.append(pixel_line)
+        self.height = len(self.pixel_lines)
+        if self.left_margin:
+            self.left_margin = min(self.left_margin, pixel_line.left_margin)
+        else:
+            self.left_margin = pixel_line.left_margin
+        if not self.width:
+            self.width = pixel_line.full_length
+    def blank(self):
+        for pixel_line in self.pixel_lines:
+            if not pixel_line.blank:
+                return False
+        return True
+
+class PixelLineInfo(object):
+    """ Information about a given line of pixels."""
+    def __init__(self, data):
+        self.full_length = len(data)
+        if 0 in data:
+            self.left_margin = data.index(0)
+            self.blank = False
+        else:
+            self.left_margin = self.full_length
+            self.blank = True
+        self.density = float(data.count(0))/self.full_length
+
+    def blank_to(self, idx):
+        """ Whether it is blank from 0 to idx. """
+        if idx < 1: 
+            # assume pct
+            idx = int(self.full_length * idx)
+        
+        return self.left_margin > idx

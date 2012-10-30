@@ -18,63 +18,15 @@ class LineManagerTester(unittest.TestCase):
         os.chdir('{}/test_line_manager'.format(PATH)) 
     
     def test_average(self):
-        lm = LineManager(StubSpellChecker(()))
+        lm = LineManager(StubSpellChecker(()), verbose=False)
         lm.load('avg_test')
         self.assertEqual(25, lm.average_length)
 
     def test_page_numbers(self):
-        lm = LineManager(StubSpellChecker(()))
+        lm = LineManager(StubSpellChecker(()), verbose=False)
         lm.load('avg_test')
         self.assertEqual(['1', '2', '3',], lm.page_numbers)
 
-    def test_simple_substitutions(self):
-        sm = SubstitutionManager(StubSpellChecker(()))
-        for test, expected in test_expected('simple_substitutions'):
-            self.assertEqual(sm.update_single_characters(test), expected)        
-    def test_word_substitutions(self):
-        good_words = (
-            u"'Jules",
-            u'Jules',
-            u'of',
-            u'the',
-            u'morning',
-            u'immediate',
-            u'government',
-            u'won\'t',
-            u'Who',
-            u'who',
-            u'flying',
-            u'to',
-            u'So',
-            u'I\'d',
-            u'on',
-            u'flick',
-            u'rid',
-            u'Soccer',
-            u'wordless',
-            u'just-being',)
-        stub_spell_checker = StubSpellChecker(good_words)
-        stub_spell_checker.fixer = EnglishSpellFixer()
-        sm = SubstitutionManager(stub_spell_checker)
-        for test, expected in test_expected('word_fixes'):
-            self.assertEqual(sm.update_words(test), expected)        
-
-    def test_number_substitutions(self):
-        good_words = (
-            u'looking',
-            u'looking-',
-            u'he',
-            u"won't",
-            u'fly\u00E9ng',
-            u'is',
-            u'so',
-            u'big',
-            u'So',
-            u'what')
-        stub_spell_checker = StubSpellChecker(good_words)
-        sm = SubstitutionManager(stub_spell_checker)
-        for test, expected in test_expected('number_fixes'):
-            self.assertEqual(sm.update_numbers(test), expected)        
 
     def test_last_word(self):
         for test, expected in test_expected('last_word'):
@@ -89,14 +41,14 @@ class LineManagerTester(unittest.TestCase):
         sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall',))
         line_one = Line('the rains in sp-', 1, sp)
         line_two = Line('ain fall', 2, sp)
-        lm = LineManager(sp)
+        lm = LineManager(sp, verbose=False)
         lm.fix_hyphen((line_one, line_two))
         self.assertEqual('the rains in', line_one.text)
         self.assertEqual('spain fall', line_two.text)
 
     def test_fix_lines(self):
         sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall', 'spa-n',))
-        lm = LineManager(sp)
+        lm = LineManager(sp, verbose=False)
         lm.load('hyphen_test')
         lm.fix_lines()
 

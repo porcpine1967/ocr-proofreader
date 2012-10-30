@@ -18,12 +18,28 @@ import gui
 def test():
     """ Whatever is being worked on."""
     """ Currently, either proper nouns or cross-line fixes."""
+    headers()
+
+def headers():
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
     checker = spell_checker.AspellSpellChecker(lang, dict_)
     db = document_builder.SpellcheckDocMaker(checker)
-#   db.make_line_join_doc('text/clean')
-    db.make_line_join_doc('test')
+    db.possible_headers('text/raw')
+
+def proper_names():
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.make_possible_proper_name_doc('text/clean')
+    
+def cross_line_fixes():
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.make_line_join_doc('text/clean')
 
 def fix_spells():
     """ Runs through the document, finds all the bad words, then 
@@ -34,8 +50,8 @@ def fix_spells():
     checker = spell_checker.AspellSpellChecker(lang, dict_)
 
     db = document_builder.SpellcheckDocMaker(checker)
-    db.make_word_fix_doc('test')
-#   db.make_word_fix_doc('text/clean')
+    db.make_word_fix_doc('text/clean')
+
 def run_gui(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
     lang = get_lang()

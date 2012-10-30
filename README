@@ -22,3 +22,10 @@ The module consists of utilities that accomplish the following:
 
 # To investigate
   * Use images to find paragraphs
+  * Page class to manage page metadata
+    * has header?
+    * line objects
+      * x,y coordinates (or box?)
+      * length
+      * density
+      * index(?)

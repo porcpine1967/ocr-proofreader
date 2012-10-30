@@ -30,7 +30,7 @@ HTML_HEADER = """
 """
 class LineManager(object):
     """ Utility class for managing line objects."""
-    def __init__(self, spell_checker, start_page=0, end_page=0):
+    def __init__(self, spell_checker, start_page=0, end_page=0, verbose=True):
         self.page_numbers = []
         self.pages = {}
         self.average_length = 0
@@ -38,6 +38,7 @@ class LineManager(object):
         self.spell_checker = spell_checker
         self.start_page = start_page
         self.end_page = end_page
+        self.verbose = verbose
 
     def remove_headers(self, header):
         """ Goes through the first rows until it finds
@@ -81,7 +82,8 @@ class LineManager(object):
             if self.end_page > 0 and int(basename) > self.end_page:
                 break
             with codecs.open('{}/{}'.format(raw_file_dir, fn), mode='r', encoding='utf-8') as f:
-                print 'Loading page {:>3}'.format(basename)
+                if self.verbose:
+                    print 'Loading page {:>3}'.format(basename)
                 self.pages[basename] = []
                 idx = 1
                 for l in f:
@@ -248,7 +250,8 @@ class LineManager(object):
             f.write(HTML_HEADER.format(title, title, author))
             last_line_short = False
             for page_nbr in self.page_numbers:
-                print 'Writing page {:3}'.format(page_nbr)
+                if self.verbose:
+                    print 'Writing page {:3}'.format(page_nbr)
                 f.write('<!-- Page {} -->\n'.format(page_nbr))
                 for line in self.pages[page_nbr]:
                     
@@ -277,7 +280,8 @@ class LineManager(object):
                 continue
             if self.end_page and int(page_nbr) > self.end_page:
                 return
-            print 'writing page {}'.format(page_nbr)
+            if self.verbose:
+                print 'writing page {}'.format(page_nbr)
             with codecs.open('{}/{}.txt'.format(clean_file_dir, page_nbr), mode='w', encoding='utf-8') as f:
                 for line in self.pages[page_nbr]:
                     if line.valid:
@@ -299,9 +303,11 @@ class LineManager(object):
             if int(page_nbr) < self.start_page:
                 continue
             if self.end_page and int(page_nbr) > self.end_page:
-                print page_nbr, self.end_page
+                if self.verbose:
+                    print page_nbr, self.end_page
                 return
-            print 'fixing page {:>3}'.format(page_nbr)
+            if self.verbose:
+                print 'fixing page {:>3}'.format(page_nbr)
             for line in self.pages[page_nbr]:
                 if line.valid:
                     self.fix_hyphen((last_line, line,))

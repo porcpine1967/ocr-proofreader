@@ -76,7 +76,7 @@ class Page(object):
 
     def in_bounds(self, median_width):
         if self.width < self.full_width:
-            return (median_width - self.width)/self.full_width < .01 
+            return abs(median_width - self.width)/self.full_width < .01 
         else:
             raise PageCropException('Wider than half page width')
 
@@ -114,25 +114,6 @@ class ImageAnalyzer(object):
         for index, pixel, in enumerate(im.getdata()):
             columns[index % self.im_width].append(pixel)
         return columns
-    def rows_and_columns(self, im):
-        """ Returns the pixel values of an image
-        divided into two multidimensional arrays."""
-    
-        self.im_width, self.im_height = im.size
-        width, height = im.size
-        rows = []
-        current_row = None
-        for index, pixel in enumerate(im.getdata()):
-            if not index % width:
-                current_row = []
-                rows.append(current_row)
-            current_row.append(pixel)
- 
-        columns = [[] for i in xrange(width)]
-        for row in rows:
-            for index, pixel in enumerate(row):
-                columns[index].append(pixel)
-        return rows, columns
 
     def text_rows(self):
         """ Returns an array of tuples that define individual rows of text.
@@ -320,4 +301,6 @@ def run():
 if __name__ == '__main__':
 #   run()
     ih = ImageHeuristic('.')
+    for fn in os.listdir('.'):
+        ih.add_image(fn)
     ih.analyze()

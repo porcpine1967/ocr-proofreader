@@ -3,6 +3,7 @@
 import unittest
 import os
 import shutil
+import subprocess
 import sys
 PATH = os.path.split(os.path.realpath(__file__))[0]
 
@@ -16,8 +17,10 @@ class SpellCheckTester(unittest.TestCase):
         self.assertEqual(['the', 'cat',], sc.check_line('the b cat c a d'))
 
     def test_aspell(self):
-        sc = spell_checker.AspellSpellChecker('en_US')
-        self.assertEqual(['afeve', 'brff',], sorted(sc.check_line('what brff needs is an afeve in the car.')))
+        with open('/dev/null', 'wb') as f:
+            if not subprocess.call(['which', 'aspell',], stdout=f, stderr=f):
+                sc = spell_checker.AspellSpellChecker('en_US')
+                self.assertEqual(['afeve', 'brff',], sorted(sc.check_line('what brff needs is an afeve in the car.')))
 
     def test_quick_fix(self):
         sc = spell_checker.StubSpellChecker(['a','b','c','d',])
@@ -78,9 +81,39 @@ class SpellCheckTester(unittest.TestCase):
         sc = spell_checker.StubSpellChecker([])
 
         # check simple
-        self.assertEqual(set(((u'bus', '5-to-s',),)), sc.transformed_variations('bu5'))
+        self.assertEqual(set(((u'bus', 'bu5', '5-to-s',),)), sc.transformed_variations('bu5'))
         # check double
-        expected = set([(u'bums', u'5-to-s'), ('burn5', u'm-to-rn'), ('bum5', u'rn-to-m'), (u'burns', u'5-to-s')])
+        expected = set([('bum5', 'burn5', u'rn-to-m'), (u'burns', 'burn5', u'5-to-s'), (u'bums', 'bum5', u'5-to-s')])
         self.assertEqual(expected, sc.transformed_variations('burn5'))
+
+
+    def test_proper_noun(self):
+        sc = spell_checker.StubSpellChecker([])
+        to_test = (
+            ('', 'Bob', True,),
+            ('', "'Bob", True,),
+            ('', '"Bob', True,),
+            ('now,', 'Bob', True,),
+            ('now,', "'Bob", True,),
+            ('now,', '"Bob', True,),
+            ('now', 'Bob', True,),
+            ('now', "'Bob", True,),
+            ('now', '"Bob', True,),
+            ('', "'bob", False,),
+            ('', '"bob', False,),
+            ('', 'bob', False,),
+            ('.', 'Bob', False),
+            ('?', 'Bob', False),
+            ('!', 'Bob', False),
+            ('."', 'Bob', False),
+            ('?"', 'Bob', False),
+            ('!"', 'Bob', False),
+            ('.\'', 'Bob', False),
+            ('?\'', 'Bob', False),
+            ('!\'', 'Bob', False),
+            )
+        for preceding_word, test, expected in to_test:
+            self.assertEquals(sc.proper_noun(preceding_word, test), expected, '{} properness should be {}'.format(test, expected))
+        
 if __name__ == '__main__':
     unittest.main()

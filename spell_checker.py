@@ -10,6 +10,9 @@ from subprocess import Popen, PIPE
 
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
+starts_with_capital = re.compile(u'["\']?{}'.format(REGEX_CAPITAL), re.UNICODE).match
+ends_sentence = re.compile(r'.*[.?!]["\']?$', re.UNICODE).match
+
 class BaseSpellFixer(object):
     """
     Class that holds regexes for all languages.
@@ -75,6 +78,7 @@ class BaseSpellFixer(object):
             re.compile(u'\\d{}'.format(REGEX_LETTER), flags=re.UNICODE),
             re.compile(u'{}\\d'.format(REGEX_LETTER), flags=re.UNICODE),
         ]
+
 class EnglishSpellFixer(BaseSpellFixer):
     def __init__(self):
         super(EnglishSpellFixer, self).__init__()
@@ -162,6 +166,7 @@ class FrenchSpellFixer(BaseSpellFixer):
             # l to !
             (re.compile(u'({}{{3,}})[li]\\.\\.'.format(REGEX_LETTER), flags=re.UNICODE), r'\1!..', u'l-or-i-to-!',),
 	])
+
 class BaseSpellChecker(object):
     
     def __init__(self):
@@ -251,12 +256,14 @@ class BaseSpellChecker(object):
 	changed_versions = [(word, '', ''),]
         for regex, replace, explanation in self.fixer.letter_fixes:
             for potential_fix, old_word, provided_explanation in changed_versions:
+                existing_words = [group[0] for group in changed_versions]
                 # try replace all first
                 new_word, count = regex.subn(replace, potential_fix)
                 # don't bother if nothing changed
                 if count == 0:
                     continue
-                changed_versions.append((new_word, potential_fix, explanation,))
+                if new_word not in existing_words:
+                    changed_versions.append((new_word, potential_fix, explanation,))
                 # try replacing one at a time
                 if count > 1: # and u'\\' not in replace:
                     for match in regex.finditer(potential_fix):
@@ -265,7 +272,8 @@ class BaseSpellChecker(object):
                             new_word[match.start():match.end()],
                             potential_fix[match.end():]
                         )
-                        changed_versions.append((new_word_2, potential_fix, explanation,))
+                        if new_word_2 not in existing_words:
+                            changed_versions.append((new_word_2, potential_fix, explanation,))
             changed_versions = list(set(changed_versions))
                 # try replacing between one and all - TODO
         changed_versions.remove((word, '', ''))
@@ -305,9 +313,20 @@ class BaseSpellChecker(object):
             # give up - cannot fix
             return word
 
-    def odd_orthography(self, line):
-        """ Returns True if the orthography is a little weird."""
-         
+
+    def proper_noun(self, preceding_word, word_to_check):
+        """ Returns boolean on whether word_to_check is grammatically correct
+        only if it is a proper noun."""
+        if not starts_with_capital(word_to_check):
+            return False
+        
+        return not ends_sentence(preceding_word)
+
+    def odd_orthography(self, word_1, word_2):
+        """ Returns True if the orthography is a little weird
+        between word one and word two.
+        """
+        
 
     def log_fix(self, context, expression, old_word, new_word):
         with codecs.open(self.log_file, mode='ab', encoding='utf-8') as f:
@@ -325,7 +344,13 @@ class StubSpellChecker(BaseSpellChecker):
         words = re.split('\s+', line, flags=re.UNICODE)
         return [word for word in words if word and not word in self.correct_words]
 
-
+    def check_document(self, filename):
+        bad_words = []
+        with codecs.open(filename, mode='rb', encoding='utf-8') as f:
+            for l in f:
+                bad_words.extend(self.check_line(l))
+        return bad_words
+                                 
 class AspellSpellChecker(BaseSpellChecker):
     def __init__(self, lang, dict_path=None):
         super(AspellSpellChecker, self).__init__()
