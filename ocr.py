@@ -18,9 +18,10 @@ import gui
 def test():
     """ Whatever is being worked on."""
     """ Currently, either proper nouns or cross-line fixes."""
-    headers()
-
-def headers():
+#   headers()
+#   remove_headers()
+    proper_names()
+def possible_headers():
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
     checker = spell_checker.AspellSpellChecker(lang, dict_)
@@ -195,7 +196,13 @@ def interactive_configuration(config):
                         config.set(section, key, value)
                         break
                 print 'Please try again\n'
-
+def remove_headers():
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.remove_possible_headers('text/clean')
+    
 def clean(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
     lang = get_lang()
@@ -204,7 +211,6 @@ def clean(start_page, end_page):
         start_page,
         end_page
         )
-    lm.load('text/clean')
 
     config = ConfigParser()
     config.read('book.cnf')
@@ -214,16 +220,17 @@ def clean(start_page, end_page):
         clean_headers = True
     if clean_headers:
 	print 'cleaning headers'
-        header = config.get('metadata', 'header')
-        lm.remove_headers(header)
+        remove_headers()
         if not config.has_section('process'):
             config.add_section('process')
         config.set('process', 'clean_headers', 'false')
         with open('book.cnf', 'wb') as f:
             config.write(f)
+        lm.load('text/clean')
         lm.quick_fix()
     else:
         # if interrupted by keyboard, go ahead and write changes
+        lm.load('text/clean')
         try:
             lm.fix_lines()
         except KeyboardInterrupt:
@@ -389,6 +396,7 @@ def run():
         aspell_run(args.start, end_page)
     elif args.action in ('fix_spells', 'ft',):
         fix_spells()
+        cross_line_fixes()
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'
     elif args.action in ('gui', 'g'):

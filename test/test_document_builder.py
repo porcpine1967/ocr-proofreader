@@ -56,3 +56,4 @@ class DocumentBuilderTester(unittest.TestCase):
                                         '{}/test_paragraphs/text/maigret.txt'.format(PATH))
         page_lines = pi.line_guess()
         self.assertEquals(len(pi.lines), len(page_lines))
+        

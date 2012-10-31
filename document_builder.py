@@ -44,8 +44,38 @@ class SpellcheckDocMaker(object):
             for page, header in sorted(headers.items(), key=lambda x: int(x[0][:-4])):
                 f.write(u'{}|{}\n'.format(page, header))
 
+    def remove_possible_headers(self, dir_):
+        """ Removes the headers that were not manually removed from the possible headers file."""
+        header_map = {}
+        with codecs.open('{}/headers.txt'.format(self.output_dir), mode='rb', encoding='utf-8') as f:
+            for l in f:
+                try:
+                    page, header = l.strip().split('|', 1)
+                    header_map[page] = header
+                except ValueError:
+                    pass
+
+        for fn in os.listdir(dir_):
+            if header_map.has_key(fn):
+                header = header_map[fn]
+                match = False
+                lines = []
+                with codecs.open('{}/{}'.format(dir_, fn), mode='rb', encoding='utf-8') as f:
+                    for l in f:
+                        if match:
+                            lines.append(l.strip())
+                        elif l.strip() == header:
+                            match = True
+                if lines:
+                    with codecs.open('{}/{}'.format(dir_, fn), mode='wb', encoding='utf-8') as f:
+                        for line in lines:
+                            f.write(u'{}\n'.format(line))
+                else:
+                    raise Exception('File {} does not have its header'.format(fn))
+
+
     def make_possible_proper_name_doc(self, dir_):
-        proper_nouns = set()
+        proper_nouns = Counter()
         hold_word = ''
         for fn in os.listdir(dir_):
             if fn.endswith('.txt'):
@@ -55,12 +85,13 @@ class SpellcheckDocMaker(object):
                         if len(words): # ignore blank lines
                             for word in words:
                                 if self.spell_checker.proper_noun(hold_word, word):
-                                    proper_nouns.add(self.letters(word))
+                                    proper_nouns[self.letters(word)] += 1
                                 hold_word = word
         with codecs.open('{}/possible_proper_nouns.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for proper_noun in proper_nouns:
-                f.write(u'{}\n'.format(proper_noun))
-        
+            for proper_noun, count in sorted(proper_nouns.items(), key=lambda x: x[0]):
+                if count > 2:
+                    f.write(u'{}\n'.format(proper_noun))
+
     def make_word_fix_doc(self, dir_):
         checker = self.spell_checker
         bad_words = set()
@@ -94,30 +125,30 @@ class SpellcheckDocMaker(object):
                             if len(words) > 1:
                                 hold_word = words[-1]
                             else:
-                                hold_word = ''  
-        
+                                hold_word = ''
+
         # need this to maintain order when checking
         fixes_array = list(fixes)
         with codecs.open('{}/hold_words.tmp'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             f.write(u' xNoTPassx '.join(fixes_array))
-        
+
         failed_joins = checker.check_document('{}/hold_words.tmp'.format(self.output_dir))
-        modified_bad_words = u''.join([spell_checker._decode(w) for w in failed_joins]).split(u'xNoTPassx') 
+        modified_bad_words = u''.join([spell_checker._decode(w) for w in failed_joins]).split(u'xNoTPassx')
         good_changes = {}
         bad_words = set()
         for idx, w in enumerate(fixes_array):
             if modified_bad_words[idx]:
                 bad_words.add(spell_checker._decode(w))
             else:
-                good_changes[w] = w
-        for bad_word, good_change in self.fixed_words(bad_words).items():
-            good_changes[bad_word] = good_change
+                good_changes[w] = [w,]
+        for bad_word, good_change_set in self.fixed_words(bad_words).items():
+            good_changes[bad_word] = good_change_set
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for bad_word, good_versions in good_changes.items():
-                    f.write(u'{}|{}\n'.format(bad_word, self.delimiter.join(good_versions)))
+                    f.write(u'{}|{}\n'.format(bad_word, '|'.join(good_versions)))
 
     def fixed_words(self, bad_words):
-        """ Takes a list of bad words and returns a dictionary of the 
+        """ Takes a list of bad words and returns a dictionary of the
         bad words that can be fixed mapped to the unique fix.
 
         bad words with multiple fixes are ignored.
@@ -144,7 +175,7 @@ class SpellcheckDocMaker(object):
                         good_versions.append(spell_checker._decode(w))
                 if good_versions:
                     good_changes[bad_word] = good_versions
-                    
+
         return good_changes
 
     def joinables(self, first_word, second_word):
@@ -153,7 +184,7 @@ class SpellcheckDocMaker(object):
         returns an array of words to check.
         """
         words_to_check = []
-        
+
         if begins_with_lowercase(second_word) \
             and len(first_word) > 2 \
             and len(second_word) > 2:
@@ -161,7 +192,7 @@ class SpellcheckDocMaker(object):
                 words_to_check.append(first_word + second_word)
             words_to_check.append(first_word[:-1] + second_word)
         return words_to_check
-        
+
     def page_image_info(self, dir_):
         pass
 
@@ -227,7 +258,6 @@ class PageInfo(object):
             minimum_jump -= 10
         return lines
 
-
     def chopped_version(self, output_file_path, header_offset=0):
         """ Outputs one file per line.
 
@@ -239,7 +269,7 @@ class PageInfo(object):
         for idx, line in enumerate(self.line_guess(header_offset)):
             image_page_b = im.crop((0, line.y, width, line.y + line.height))
             image_page_b.save(output_file_path.format(idx))
-            
+
 class LineInfo(object):
     def __init__(self, y):
         self.pixel_lines = []
