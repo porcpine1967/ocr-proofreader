@@ -177,7 +177,6 @@ def interactive_configuration(config):
         ('extract_text', 'lang', 'What language is the book written in? (Please use aspell abbreviation)'),
         ('metadata', 'title', 'What is the title of the book?'),
         ('metadata', 'author', 'Who is the author of the book?'),
-        ('metadata', 'header', 'What is the header text of the book?'),
         ('metadata', 'html_file', 'What would you like the html file to be called?'),
         
     )
@@ -196,6 +195,7 @@ def interactive_configuration(config):
                         config.set(section, key, value)
                         break
                 print 'Please try again\n'
+
 def remove_headers():
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
@@ -395,7 +395,7 @@ def run():
             end_page = args.end
         aspell_run(args.start, end_page)
     elif args.action in ('fix_spells', 'ft',):
-        fix_spells()
+#       fix_spells()
         cross_line_fixes()
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'

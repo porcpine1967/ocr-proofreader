@@ -251,6 +251,32 @@ class BaseSpellChecker(object):
 #           if not self.check_line(new_word):
 #               self.log_fix('force_hyphen_fix', 'hyphen-at-{}'.format(idx), word, new_word)
 #               return new_word
+    def good_and_bad(self, to_check):
+        """ Given an array (order is important) of words returns good and bad collections.
+
+        First is a collection of correctly spelled words. 
+        Second is a collection of misspelled words.
+        """
+        self.output_dir = 'working'
+        good_versions = []
+        bad_versions = []
+        with codecs.open('{}/hold_words.tmp'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
+            f.write(u' xNoTPassx '.join(to_check))
+        # aspell maintains order of bad words, but does not return good words
+        # we therefore need some way to indicate that nothing was returned
+        # (that is the word was good) in a given area.  This is noted by
+        # a repetition of xNoTPassx
+        # We then split on that, which leaves empty strings in the space
+        # that have good words (which fail a boolean test in python)
+        failed_versions = self.check_document('{}/hold_words.tmp'.format(self.output_dir))
+        words_if_bad = u''.join([_decode(w) for w in failed_versions]).split(u'xNoTPassx')
+        for idx, w in enumerate(to_check):
+            if not words_if_bad[idx]:
+                good_versions.append(w)
+            else:
+                bad_versions.append(w)
+        return good_versions, bad_versions
+
     def transformed_variations(self, word):
         """ Run through the fixer's fixes and return all variations."""
 	changed_versions = [(word, '', ''),]

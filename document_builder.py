@@ -129,18 +129,10 @@ class SpellcheckDocMaker(object):
 
         # need this to maintain order when checking
         fixes_array = list(fixes)
-        with codecs.open('{}/hold_words.tmp'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            f.write(u' xNoTPassx '.join(fixes_array))
-
-        failed_joins = checker.check_document('{}/hold_words.tmp'.format(self.output_dir))
-        modified_bad_words = u''.join([spell_checker._decode(w) for w in failed_joins]).split(u'xNoTPassx')
         good_changes = {}
-        bad_words = set()
-        for idx, w in enumerate(fixes_array):
-            if modified_bad_words[idx]:
-                bad_words.add(spell_checker._decode(w))
-            else:
-                good_changes[w] = [w,]
+        good_versions, bad_words = checker.good_and_bad(fixes_array)
+        for w in good_versions:
+            good_changes[w] = [w,]
         for bad_word, good_change_set in self.fixed_words(bad_words).items():
             good_changes[bad_word] = good_change_set
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
@@ -149,9 +141,7 @@ class SpellcheckDocMaker(object):
 
     def fixed_words(self, bad_words):
         """ Takes a list of bad words and returns a dictionary of the
-        bad words that can be fixed mapped to the unique fix.
-
-        bad words with multiple fixes are ignored.
+        bad words with 1 or more fixes.
         """
         checker = self.spell_checker
         good_changes = {}
@@ -160,19 +150,7 @@ class SpellcheckDocMaker(object):
             good_versions = []
             if changed_versions:
                 changed_words = [t[0] for t in changed_versions]
-                with codecs.open('{}/hold_words.tmp'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-                    f.write(u' xNoTPassx '.join(changed_words))
-                # aspell maintains order of bad words, but does not return good words
-                # we therefore need some way to indicate that nothing was returned
-                # (that is the word was good) in a given area.  This is noted by
-                # a repetition of xNoTPassx
-                # We then split on that, which leaves empty strings in the space
-                # that have good words (which fail a boolean test in python)
-                failed_versions = checker.check_document('{}/hold_words.tmp'.format(self.output_dir))
-                words_if_bad = u''.join([spell_checker._decode(w) for w in failed_versions]).split(u'xNoTPassx')
-                for idx, w in enumerate(changed_words):
-                    if not words_if_bad[idx]:
-                        good_versions.append(spell_checker._decode(w))
+		good_versions, wtvr = checker.good_and_bad(changed_words)
                 if good_versions:
                     good_changes[bad_word] = good_versions
 
