@@ -205,12 +205,6 @@ def remove_headers():
     
 def clean(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
-    lang = get_lang()
-    lm = line_manager.LineManager(
-        spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
-        start_page,
-        end_page
-        )
 
     config = ConfigParser()
     config.read('book.cnf')
@@ -226,10 +220,25 @@ def clean(start_page, end_page):
         config.set('process', 'clean_headers', 'false')
         with open('book.cnf', 'wb') as f:
             config.write(f)
+        lang = get_lang()
+        lm = line_manager.LineManager(
+            spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
+            start_page,
+            end_page
+            )
         lm.load('text/clean')
         lm.quick_fix()
     else:
         # if interrupted by keyboard, go ahead and write changes
+        lang = get_lang()
+#           spell_checker.FileConfiguredSpellChecker(lang, './dict.{}.pws'.format(lang)),
+#           spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
+        lm = line_manager.LineManager(
+#           spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
+            spell_checker.FileConfiguredSpellChecker(lang, './dict.{}.pws'.format(lang)),
+            start_page,
+            end_page
+            )
         lm.load('text/clean')
         try:
             lm.fix_lines()
@@ -395,7 +404,7 @@ def run():
             end_page = args.end
         aspell_run(args.start, end_page)
     elif args.action in ('fix_spells', 'ft',):
-#       fix_spells()
+        fix_spells()
         cross_line_fixes()
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'

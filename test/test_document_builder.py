@@ -13,6 +13,7 @@ PATH = os.path.split(os.path.realpath(__file__))[0]
 class DocumentBuilderTester(unittest.TestCase):
     def test_fixed_words(self):
         sc = spell_checker.StubSpellChecker([
+            'Cantrip',
             'government',
             'bomb',
             'born',
@@ -40,7 +41,8 @@ class DocumentBuilderTester(unittest.TestCase):
             )
         db = document_builder.SpellcheckDocMaker(spell_checker.StubSpellChecker([]))        
         for word1, word2, expected in to_test:
-            self.assertEqual(db.joinables(word1, word2), expected)
+            self.assertEqual(spell_checker.joinables(word1, word2), expected)
+
     def test_page_info(self):
         pi = document_builder.PageInfo('{}/test_paragraphs/images/straight.pbm'.format(PATH),
                                         '{}/test_paragraphs/text/straight.txt'.format(PATH))

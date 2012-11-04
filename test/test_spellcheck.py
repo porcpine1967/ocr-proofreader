@@ -37,6 +37,7 @@ class SpellCheckTester(unittest.TestCase):
 
     def test_fix_spelling(self):
         sc = spell_checker.StubSpellChecker([
+            'Cantrip',
             'government',
             'bomb',
             'born',

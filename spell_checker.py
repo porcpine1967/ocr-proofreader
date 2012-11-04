@@ -10,6 +10,8 @@ from subprocess import Popen, PIPE
 
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
+begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
+ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
 starts_with_capital = re.compile(u'["\']?{}'.format(REGEX_CAPITAL), re.UNICODE).match
 ends_sentence = re.compile(r'.*[.?!]["\']?$', re.UNICODE).match
 
@@ -46,6 +48,7 @@ class BaseSpellFixer(object):
         self.letter_fixes = [
             (re.compile(r'rn', flags=re.UNICODE), r'm', u'rn-to-m',),
             (re.compile(r'm', flags=re.UNICODE), r'rn', u'm-to-rn',),
+            (re.compile(r'ri', flags=re.UNICODE), r'n', u'ri-to-n',),
             (re.compile(u'({})O'.format(REGEX_LETTER), flags=re.UNICODE), r'\1o', u'XO-to-Xo',),
             (re.compile(r'ck', flags=re.UNICODE), u'd', u'ck-to-d',),
             (re.compile(r'cl', flags=re.UNICODE), u'd', u'cl-to-d',),
@@ -172,6 +175,7 @@ class BaseSpellChecker(object):
     def __init__(self):
         self.log_file = 'automatic_fixes.log'
         self.format_string = u'{:30} {:30} {:30} {:30}\n'
+        self.line_join_fixes = {}
 
     def quick_fix(self, word):
         """ Takes a string and returns the 'quick fix' version."""
@@ -190,21 +194,10 @@ class BaseSpellChecker(object):
                 return True
         return False
 
-    def hyphenate(self, word, min_chars=3):
-        """ See if adding a hyphen or replacing
-        a character with a hyphen helps.
 
-        Will only hyphenate if min_chars (default 3) or more characters
-        on each side."""
-        
-	spell_version = _decode(' '.join(self.check_line(word)))
-        # don't fix if it isn't broken
-        # don't fix if could not have minimum characters
-        # on each side
-        if not spell_version or len(spell_version) < 2*min_chars:
-            return word
-        fixed_versions = []
-        # first try replacing characters
+    def hyphenated_versions(self, word, min_chars=3):
+        hyphenates = []
+        # try replacing characters
         for idx, char in enumerate(word):
             if idx < min_chars or len(word) - idx < min_chars + 1:
                 continue
@@ -213,7 +206,24 @@ class BaseSpellChecker(object):
                 '-',
                 word[idx + 1:]
             )
-            fixed_versions.append((new_word, 'hyphen-at-{}'.format(idx),))
+            hyphenates.append((new_word, 'hyphen-at-{}'.format(idx),))
+        return hyphenates
+
+    def hyphenate(self, word, min_chars=3):
+        """ See if adding a hyphen or replacing
+        a character with a hyphen helps.
+
+        Will only hyphenate if min_chars (default 3) or more characters
+        on each side."""
+	spell_version = _decode(' '.join(self.check_line(word)))
+        # don't fix if it isn't broken
+        # don't fix if could not have minimum characters
+        # on each side
+        if not spell_version or len(spell_version) < 2*min_chars:
+            return word
+
+        fixed_versions = self.hyphenated_versions(word, min_chars)
+
 	if fixed_versions:
             fixed_words = [t[0] for t in fixed_versions]
             bad_versions = [_decode(v) for v in self.check_line(' '.join(fixed_words))]
@@ -251,15 +261,19 @@ class BaseSpellChecker(object):
 #           if not self.check_line(new_word):
 #               self.log_fix('force_hyphen_fix', 'hyphen-at-{}'.format(idx), word, new_word)
 #               return new_word
-    def good_and_bad(self, to_check):
-        """ Given an array (order is important) of words returns good and bad collections.
+    def failed_words(self, to_check):
+        """ Given an array of words, returns array of same length, with the
+        'good' words blank and the 'bad' words what the spell checker
+        thinks is a bad word.
 
-        First is a collection of correctly spelled words. 
-        Second is a collection of misspelled words.
+        Because the spell checker might not preserve punctuation, we
+        can't do simple substitution of bad and good words.
+
+        Note: because what the line manager thinks is one word might be construed
+        as two words by the spell checker, any thing using this should probably
+        split the results.
         """
         self.output_dir = 'working'
-        good_versions = []
-        bad_versions = []
         with codecs.open('{}/hold_words.tmp'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             f.write(u' xNoTPassx '.join(to_check))
         # aspell maintains order of bad words, but does not return good words
@@ -269,9 +283,19 @@ class BaseSpellChecker(object):
         # We then split on that, which leaves empty strings in the space
         # that have good words (which fail a boolean test in python)
         failed_versions = self.check_document('{}/hold_words.tmp'.format(self.output_dir))
-        words_if_bad = u''.join([_decode(w) for w in failed_versions]).split(u'xNoTPassx')
+        return u''.join([_decode(w) for w in failed_versions]).split(u'xNoTPassx')
+
+    def good_and_bad(self, to_check):
+        """ Given an array (order is important) of words returns good and bad collections.
+
+        First is a collection of correctly spelled words. 
+        Second is a collection of misspelled words.
+        """
+        failed_words = self.failed_words(to_check)
+        good_versions = []
+        bad_versions = []
         for idx, w in enumerate(to_check):
-            if not words_if_bad[idx]:
+            if not failed_words[idx]:
                 good_versions.append(w)
             else:
                 bad_versions.append(w)
@@ -295,7 +319,7 @@ class BaseSpellChecker(object):
                     for match in regex.finditer(potential_fix):
                         new_word_2 = u'{}{}{}'.format(
                             potential_fix[:match.start()],
-                            new_word[match.start():match.end()],
+                            match.expand(replace),
                             potential_fix[match.end():]
                         )
                         if new_word_2 not in existing_words:
@@ -303,6 +327,8 @@ class BaseSpellChecker(object):
             changed_versions = list(set(changed_versions))
                 # try replacing between one and all - TODO
         changed_versions.remove((word, '', ''))
+        for hyphenate in self.hyphenated_versions(word):
+            changed_versions.append((hyphenate[0], word, hyphenate[1],))
         return set(changed_versions)
 
     def fix_spelling(self, word):
@@ -358,17 +384,39 @@ class BaseSpellChecker(object):
         with codecs.open(self.log_file, mode='ab', encoding='utf-8') as f:
             f.write(self.format_string.format(context, expression, old_word, new_word))
 
+    def check_join(self, word_a, word_b):
+        for join in joinables(word_a, word_b):
+            try:
+                return self.line_join_fixes[join]
+            except KeyError:
+                pass
+        return None
+
+    def fix_line(self, line):
+        """ Has all the words in the line fix themselves.
+
+        Probably reciprocal (it would call the spell checker to fix),
+        but overriden below."""
+        line.build_words()
+        for word in line.words:
+            word.correct_spelling()
+            word.hyphenate()
+        line.rebuild()       
+
 class StubSpellChecker(BaseSpellChecker):
-    def __init__(self, correct_words):
+    def __init__(self, correct_words, line_join_fixes={}):
 	super(BaseSpellChecker, self).__init__()
         self.correct_words = correct_words
         self.fixer = BaseSpellFixer()
 	self.log_file = '/var/tmp/test.log'
 	self.format_string = ''
+        self.line_join_fixes = line_join_fixes
 
     def check_line(self, line):
         words = re.split('\s+', line, flags=re.UNICODE)
         return [word for word in words if word and not word in self.correct_words]
+
+
 
     def check_document(self, filename):
         bad_words = []
@@ -376,6 +424,7 @@ class StubSpellChecker(BaseSpellChecker):
             for l in f:
                 bad_words.extend(self.check_line(l))
         return bad_words
+
                                  
 class AspellSpellChecker(BaseSpellChecker):
     def __init__(self, lang, dict_path=None):
@@ -445,3 +494,58 @@ def _decode(word):
         return word.decode('utf-8') 
     except UnicodeEncodeError:
         return word
+
+class FileConfiguredSpellChecker(AspellSpellChecker):
+    """ Uses Files created by document builder to check things."""
+    def __init__(self, lang, dict_, dir_='working'):
+        super(FileConfiguredSpellChecker, self).__init__(lang, dict_)
+        self.load_word_fixes(dir_)
+        self.load_line_join_fixes(dir_)
+
+    def load_word_fixes(self, dir_):
+        self.word_fixes = {}
+        with codecs.open('{}/word_fixes.txt'.format(dir_), mode='rb', encoding='utf-8') as f:
+            for l in f:
+                key, value = l.split('|', 1)
+                self.word_fixes[key] = value
+
+    def load_line_join_fixes(self, dir_):
+        self.line_join_fixes = {}
+        with codecs.open('{}/line_join_fixes.txt'.format(dir_), mode='rb', encoding='utf-8') as f:
+            for l in f:
+                key, value = l.split('|', 1)
+                self.line_join_fixes[key] = value
+
+    def fix_spelling(self, word):
+        try:
+            return self.word_fixes[word]
+        except KeyError:
+            return word
+
+    def fix_line(self, line):
+	words = line.text.split()
+	failed_words = self.failed_words(words)
+        for idx, failed_word_set in enumerate(failed_words):
+            if failed_word_set:
+                word = words[idx]
+                for failed_word in failed_word_set.split():
+                    fix = self.fix_spelling(failed_word)
+                    if fix != failed_word:
+                        words[idx] = word.replace(failed_word, fix)                    
+        line.set_text(u' '.join(words))
+                    
+
+def joinables(first_word, second_word):
+    """ Sees if it would be worth while joining the word.
+
+    returns an array of words to check.
+    """
+    words_to_check = []
+
+    if begins_with_lowercase(second_word) \
+        and len(first_word) > 2 \
+        and len(second_word) > 2:
+        if ends_with_lowercase(first_word):
+            words_to_check.append(first_word + second_word)
+        words_to_check.append(first_word[:-1] + second_word)
+    return words_to_check

@@ -11,8 +11,6 @@ import sys
 import spell_checker
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
-begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
-ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
 punctuation_stripper = re.compile(u'.*?({}.*{}).*'.format(REGEX_LETTER, REGEX_LETTER), re.UNICODE).match
 
 class SpellcheckDocMaker(object):
@@ -101,7 +99,12 @@ class SpellcheckDocMaker(object):
                     bad_words.add(spell_checker._decode(bad_word))
         fixes = self.fixed_words(bad_words)
         with codecs.open('{}/word_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for bad_word, good_versions in fixes.items():
+            for bad_word, good_versions in sorted(fixes.items(), key=lambda x: x[0]):
+                # remove hyphened versions if others are present
+                if not '-' in bad_word:
+                    good_unhyphened = [word for word in good_versions if not '-' in word]
+                    if good_unhyphened:
+                        good_versions = good_unhyphened
                 f.write(u'{}|{}\n'.format(bad_word, self.delimiter.join(good_versions)))
 
     def make_line_join_doc(self, dir_):
@@ -120,7 +123,7 @@ class SpellcheckDocMaker(object):
                     for l in f:
                         words = l.split()
                         if len(words): # ignore blank lines
-                            fixes.update(self.joinables(hold_word, words[0]))
+                            fixes.update(spell_checker.joinables(hold_word, words[0]))
                             # blank out the hold word if only one word in line
                             if len(words) > 1:
                                 hold_word = words[-1]
@@ -135,6 +138,7 @@ class SpellcheckDocMaker(object):
             good_changes[w] = [w,]
         for bad_word, good_change_set in self.fixed_words(bad_words).items():
             good_changes[bad_word] = good_change_set
+
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for bad_word, good_versions in good_changes.items():
                     f.write(u'{}|{}\n'.format(bad_word, '|'.join(good_versions)))
@@ -156,23 +160,10 @@ class SpellcheckDocMaker(object):
 
         return good_changes
 
-    def joinables(self, first_word, second_word):
-        """ Sees if it would be worth while joining the word.
-
-        returns an array of words to check.
-        """
-        words_to_check = []
-
-        if begins_with_lowercase(second_word) \
-            and len(first_word) > 2 \
-            and len(second_word) > 2:
-            if ends_with_lowercase(first_word):
-                words_to_check.append(first_word + second_word)
-            words_to_check.append(first_word[:-1] + second_word)
-        return words_to_check
-
     def page_image_info(self, dir_):
         pass
+
+
 
 class PageInfo(object):
     """ Maps an image to its text."""
