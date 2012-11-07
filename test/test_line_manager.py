@@ -31,31 +31,33 @@ class LineManagerTester(unittest.TestCase):
     def test_last_word(self):
         for test, expected in test_expected('last_word'):
             line = Line(test, 1, StubSpellChecker(()))
-            self.assertEqual(line.last_word().text, expected)
+            self.assertEqual(line.last_word(), expected)
     def test_first_word(self):
         for test, expected in test_expected('first_word'):
             line = Line(test, 1, StubSpellChecker(()))
-            self.assertEqual(line.first_word().text, expected)
+            self.assertEqual(line.first_word(), expected)
 
     def test_fix_hyphen(self):
-        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall',))
+        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall',),
+            {'sp-_ain': 'spain'})
         line_one = Line('the rains in sp-', 1, sp)
         line_two = Line('ain fall', 2, sp)
         lm = LineManager(sp, verbose=False)
         lm.fix_hyphen((line_one, line_two))
-        self.assertEqual('the rains in', line_one.text)
-        self.assertEqual('spain fall', line_two.text)
+        self.assertEqual('the rains in spain', line_one.text)
+        self.assertEqual('fall', line_two.text)
 
     def test_fix_lines(self):
-        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall', 'spa-n',))
+        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall', 'spa-n',),
+            {'sp-_ain': 'spain', 'ra-_ins' : 'rains'})
         lm = LineManager(sp, verbose=False)
         lm.load('hyphen_test')
         lm.fix_lines()
 
         page_one = ' '.join([line.text for line in lm.pages['1']])
         page_two = ' '.join([line.text for line in lm.pages['2'] if line.valid])
-        self.assertEquals('the rains in spain fall spaen in spain the', page_one)
-        self.assertEquals('rains fall', page_two)
+        self.assertEquals('the rains in spain fall spaen in spain the rains', page_one)
+        self.assertEquals('fall', page_two)
 
     def test_verify_word(self):
         sc = StubSpellChecker(('bob', 'bo-b'))

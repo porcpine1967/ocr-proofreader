@@ -320,15 +320,18 @@ class LineManager(object):
         for page_nbr in self.page_numbers:
             for line in self.pages[page_nbr]:
                 if line.valid:
-                    line.build_words(True)
+                    line.text = self.spell_checker.quick_fix(line.text)
 
     def fix_hyphen(self, lines):
         if not lines[0] or not lines[1]:
             return
-        lines[1].first_word().prepend(lines[0].last_word())
-        lines[0].rebuild()
-        lines[1].rebuild()
-
+        word_1 = lines[0].last_word()
+        word_2 = lines[1].first_word()
+        fix = self.spell_checker.check_join(word_1, word_2)
+        if fix:
+            lines[0].replace_last_word(fix)
+            lines[1].pop_first_word()
+                
 class Line(object):
     """ Manages individual lines of a book. """
     def __init__(self, raw_text, line_nbr, spell_checker):
@@ -375,36 +378,30 @@ class Line(object):
         self.rebuild()
 
     def last_word(self):
-        self.build_words()
         try:
-            return [word for word in self.words if word.text][-1]
+            return self.text.split()[-1]
         except IndexError:
-            return self.null_word
+            return ''
 
     def first_word(self):
-        self.build_words()
         try:
-            return [word for word in self.words if word.text][0]
-
+            return self.text.split()[0]
         except IndexError:
-            return self.null_word
+            return ''
 
     def fix(self):
-        self.build_words()
-        for word in self.words:
-            word.correct_spelling()
-            word.hyphenate()
-        self.rebuild()       
+	self.spell_checker.fix_line(self)
 
-    def pop_last_word(self):
-        """ For joining hyphens, removes last word of line."""
-        popped = self.last_word().replace(r'(', r'\(')
-        self.text = re.sub(u'{}$'.format(popped), '', self.text, flags=re.UNICODE).strip()
+    def pop_first_word(self):
+        """ For joining hyphens, removes first word of line."""
+        self.text = u' '.join(self.text.split()[1:])
 
 
-    def prepend_word(self, word):
+    def replace_last_word(self, word):
         """ For joining hyphens, puts the prefix of the word in front."""
-        self.text = u'{}{}'.format(word, self.text)
+        words = self.text.split()
+        words[-1] = word
+        self.text = u' '.join(words)
 
     def has_odd_punctuation(self):
         """ Returns a boolean if matches any bad punctuation."""

@@ -93,19 +93,44 @@ class SpellcheckDocMaker(object):
     def make_word_fix_doc(self, dir_):
         checker = self.spell_checker
         bad_words = set()
+
+	bad_bad_map = {}
+        word_set = set()
         for fn in os.listdir(dir_):
             if fn.endswith('.txt'):
-                for bad_word in checker.check_document('{}/{}'.format(dir_, fn)):
-                    bad_words.add(spell_checker._decode(bad_word))
+                with codecs.open('{}/{}'.format(dir_, fn), mode='rb', encoding='utf-8') as f:
+                    for l in f:
+                        word_set.update(l.split())
+	print '{} words'.format(len(word_set))
+ 
+        words = list(word_set)
+        for idx, bad_word in enumerate(self.spell_checker.failed_words(words)):
+            if bad_word:
+                bad_words.add(spell_checker._decode(bad_word))
+                bad_bad_map[words[idx]] = bad_word
+	print '{} bad words'.format(len(bad_words))
+
         fixes = self.fixed_words(bad_words)
+	print '{} fixes'.format(len(fixes))
+	still_bad = Counter()
         with codecs.open('{}/word_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for bad_word, good_versions in sorted(fixes.items(), key=lambda x: x[0]):
-                # remove hyphened versions if others are present
-                if not '-' in bad_word:
-                    good_unhyphened = [word for word in good_versions if not '-' in word]
-                    if good_unhyphened:
-                        good_versions = good_unhyphened
-                f.write(u'{}|{}\n'.format(bad_word, self.delimiter.join(good_versions)))
+            for bad_version, bad_word in sorted(bad_bad_map.items(), key=lambda x: x[0]):
+                try:
+                    good_versions = fixes[bad_word]
+                    # remove hyphened versions if others are present
+                    if not '-' in bad_word:
+                        good_unhyphened = [word for word in good_versions if not '-' in word]
+                        if good_unhyphened:
+                            good_versions = good_unhyphened
+                    fixed_good_versions = []
+                    for version in good_versions:
+                        fixed_good_versions.append(bad_version.replace(bad_word, version))
+                    f.write(u'{}|{}\n'.format(bad_version, self.delimiter.join(fixed_good_versions)))
+                except KeyError:
+                    still_bad[bad_word] += 1
+        with codecs.open('{}/bad_words.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
+            for bad_word, cnt in still_bad.most_common():
+                f.write(u'{:>20}: {:>3}\n'.format(bad_word, cnt))
 
     def make_line_join_doc(self, dir_):
         """Creates a document of fixes for cross-line joining.
@@ -115,29 +140,44 @@ class SpellcheckDocMaker(object):
         joinedwords|delimiter-separated-fixes
         """
         checker = self.spell_checker
+        potential_fix_list = []
         fixes = set()
         hold_word = ''
         for fn in os.listdir(dir_):
             if fn.endswith('.txt'):
+                sys.stdout.write('.')
                 with codecs.open('{}/{}'.format(dir_, fn), mode='r', encoding='utf-8') as f:
                     for l in f:
                         words = l.split()
                         if len(words): # ignore blank lines
-                            fixes.update(spell_checker.joinables(hold_word, words[0]))
+                            joinables = spell_checker.valid_joinables(hold_word, words[0], self.spell_checker)
+                            for joinable in joinables:
+                                potential_fix_list.append((hold_word, words[0], joinable,))
+                            fixes.update(joinables)
                             # blank out the hold word if only one word in line
                             if len(words) > 1:
                                 hold_word = words[-1]
                             else:
                                 hold_word = ''
+        print ''
+        print '{} potential fixes'.format(len(potential_fix_list))
+        print '{} joinables'.format(len(fixes))
 
         # need this to maintain order when checking
         fixes_array = list(fixes)
         good_changes = {}
         good_versions, bad_words = checker.good_and_bad(fixes_array)
+        print '{} good versions'.format(len(good_versions))
         for w in good_versions:
-            good_changes[w] = [w,]
+            for word_1, word_2, joinable in potential_fix_list:
+                if joinable == w:
+                    good_changes[u'{}_{}'.format(word_1, word_2)] = [w,]
+        
         for bad_word, good_change_set in self.fixed_words(bad_words).items():
-            good_changes[bad_word] = good_change_set
+            for word_1, word_2, joinable in potential_fix_list:
+                if joinable == bad_word:
+                    good_changes[u'{}_{}'.format(word_1, word_2)] = good_change_set
+        print '{} bad versions fixed'.format(len(good_changes) - len(good_versions))
 
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for bad_word, good_versions in good_changes.items():

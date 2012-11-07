@@ -18,9 +18,9 @@ import gui
 def test():
     """ Whatever is being worked on."""
     """ Currently, either proper nouns or cross-line fixes."""
-#   headers()
+    possible_headers()
 #   remove_headers()
-    proper_names()
+#   proper_names()
 def possible_headers():
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
@@ -343,6 +343,8 @@ def run():
         'html': 'h',
         'gui': 'g',
         'fix_spells': 'fs',
+        'fix_all': 'fa',
+        'fix_lines': 'fl',
         'test': 't',
     }
     parser = ArgumentParser(
@@ -403,8 +405,12 @@ def run():
         else:
             end_page = args.end
         aspell_run(args.start, end_page)
+    elif args.action in ('fix_all', 'ft',):
+        fix_spells()
+        cross_line_fixes()
     elif args.action in ('fix_spells', 'ft',):
         fix_spells()
+    elif args.action in ('fix_lines', 'ft',):
         cross_line_fixes()
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'

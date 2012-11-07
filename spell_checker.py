@@ -12,6 +12,7 @@ from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
 begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
 ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
+ends_with_hyphen = re.compile(r'.*-$', re.UNICODE).match
 starts_with_capital = re.compile(u'["\']?{}'.format(REGEX_CAPITAL), re.UNICODE).match
 ends_sentence = re.compile(r'.*[.?!]["\']?$', re.UNICODE).match
 
@@ -30,9 +31,9 @@ class BaseSpellFixer(object):
         """
         self.quick_fixes = [
             # hyphen at end of line
-            (re.compile(u'(.)[=<~\xbb\u2014\u2013]+$', flags=re.UNICODE), r'\1-', 'hyphen-at-end-of-line',),
+            (re.compile(u'([^=<~\xbb\u2014\u2013-])[=<~\xbb\u2014\u2013-]+$', flags=re.UNICODE), r'\1-', 'hyphen-at-end-of-line',),
             # hyphen between letters
-            (re.compile(u'({})[=<~\u2014\u2013\xbb]+({})'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE), r'\1-\2', 'hyphen-between-letters',),
+            (re.compile(u'({})[=<~\u2014\u2013\xbb-]+({})'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE), r'\1-\2', 'hyphen-between-letters',),
             # hyphen anywhere
             (re.compile(u'[~\u2014\u2013\xbb]+', flags=re.UNICODE), '-', 'hyphen-anywhere',),
             # weird combined f
@@ -301,11 +302,20 @@ class BaseSpellChecker(object):
                 bad_versions.append(w)
         return good_versions, bad_versions
 
-    def transformed_variations(self, word):
-        """ Run through the fixer's fixes and return all variations."""
+    def transformed_variations(self, word, append=True):
+        """ Run through the fixer's fixes and return all variations.
+        append means run through variations of variations, called
+        with false when too many transformations are happening
+        """
 	changed_versions = [(word, '', ''),]
+	versions_to_fix = [(word, '', ''),]
         for regex, replace, explanation in self.fixer.letter_fixes:
-            for potential_fix, old_word, provided_explanation in changed_versions:
+            if append:
+                versions_to_fix = changed_versions
+            if len(versions_to_fix) > 200:
+                return self.transformed_variations(word, False)
+            
+            for potential_fix, old_word, provided_explanation in versions_to_fix:
                 existing_words = [group[0] for group in changed_versions]
                 # try replace all first
                 new_word, count = regex.subn(replace, potential_fix)
@@ -385,12 +395,10 @@ class BaseSpellChecker(object):
             f.write(self.format_string.format(context, expression, old_word, new_word))
 
     def check_join(self, word_a, word_b):
-        for join in joinables(word_a, word_b):
-            try:
-                return self.line_join_fixes[join]
-            except KeyError:
-                pass
-        return None
+        try:
+            return self.line_join_fixes[u'{}_{}'.format(word_a, word_b)]
+        except KeyError:
+            return None
 
     def fix_line(self, line):
         """ Has all the words in the line fix themselves.
@@ -507,14 +515,14 @@ class FileConfiguredSpellChecker(AspellSpellChecker):
         with codecs.open('{}/word_fixes.txt'.format(dir_), mode='rb', encoding='utf-8') as f:
             for l in f:
                 key, value = l.split('|', 1)
-                self.word_fixes[key] = value
+                self.word_fixes[key] = value.strip()
 
     def load_line_join_fixes(self, dir_):
         self.line_join_fixes = {}
         with codecs.open('{}/line_join_fixes.txt'.format(dir_), mode='rb', encoding='utf-8') as f:
             for l in f:
                 key, value = l.split('|', 1)
-                self.line_join_fixes[key] = value
+                self.line_join_fixes[key] = value.strip()
 
     def fix_spelling(self, word):
         try:
@@ -524,16 +532,19 @@ class FileConfiguredSpellChecker(AspellSpellChecker):
 
     def fix_line(self, line):
 	words = line.text.split()
-	failed_words = self.failed_words(words)
-        for idx, failed_word_set in enumerate(failed_words):
-            if failed_word_set:
-                word = words[idx]
-                for failed_word in failed_word_set.split():
-                    fix = self.fix_spelling(failed_word)
-                    if fix != failed_word:
-                        words[idx] = word.replace(failed_word, fix)                    
-        line.set_text(u' '.join(words))
+        for idx, word in enumerate(words):
+            words[idx] = self.fix_spelling(word)
+        line.text = (u' '.join(words))
+
+def valid_joinables(first_word, second_word, checker):
+    """ Only returns joinables if would join. """
                     
+    if not begins_with_lowercase(second_word):
+        return []
+    if ends_with_hyphen(first_word) or \
+        checker.check_line(' '.join([first_word, second_word,])):
+        return joinables(first_word, second_word)
+    return []
 
 def joinables(first_word, second_word):
     """ Sees if it would be worth while joining the word.
