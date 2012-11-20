@@ -59,3 +59,23 @@ class DocumentBuilderTester(unittest.TestCase):
         page_lines = pi.line_guess()
         self.assertEquals(len(pi.lines), len(page_lines))
         
+    def test_line_image(self):
+        test_image = Image.open('{}/test_paragraphs/images/test.pbm'.format(PATH))
+        expected_pixels = []
+        for pixel in test_image.getdata():
+            expected_pixels.append(pixel)
+        pi = document_builder.PageInfo('{}/test_paragraphs/images/straight.pbm'.format(PATH),
+                                        '{}/test_paragraphs/text/straight.txt'.format(PATH))
+        page_lines = pi.line_guess()
+        im = Image.open('{}/test_paragraphs/images/straight.pbm'.format(PATH))
+        im2 = page_lines[5].image(im)
+        derived_pixels = []
+        for pixel in im2.getdata():
+            derived_pixels.append(pixel)
+        self.assertEquals(expected_pixels, derived_pixels)
+
+#   def test_line_column(self):
+#       pi = document_builder.PageInfo('{}/test_paragraphs/images/straight.pbm'.format(PATH),
+#                                       '{}/test_paragraphs/text/straight.txt'.format(PATH))
+#       for num, column in sorted(pi.pixel_columns.items(), key=lambda x: x[0]): 
+#           print '{:>4}: {:.3f}'.format(num, column.density())

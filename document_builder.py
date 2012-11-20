@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """ This module creates useful documents for cleaning."""
 
-from collections import Counter
 import codecs
+from collections import Counter, defaultdict
+import csv
 import Image
 import os
 import re
@@ -200,9 +201,27 @@ class SpellcheckDocMaker(object):
 
         return good_changes
 
-    def page_image_info(self, dir_):
-        pass
+    def page_image_info(self, text_dir_, images_dir_):
+        print 'in page image info'
+        with open('working/page_info.csv', 'wb') as f:
+            writer = csv.writer(f)
 
+            for fn in os.listdir(text_dir_):
+                print fn
+                name, extension = os.path.splitext(fn)
+                text_path = '{}/{}.txt'.format(text_dir_, name)
+                image_path = '{}/{}.pbm'.format(images_dir_, name)
+                if extension == '.txt' and os.path.exists(image_path):
+                    sys.stdout.write('.')
+                    pi = PageInfo(image_path, text_path)
+                    page_lines = pi.line_guess()
+                    for line in page_lines:
+                        writer.writerow((
+                            name,
+                            line.height,
+                            line.left_margin,
+                            line.y,
+                            line.width,))
 
 
 class PageInfo(object):
@@ -246,7 +265,7 @@ class PageInfo(object):
                 check_line = leap or pixel_line.blank
             last_left_margin = pixel_line.left_margin
             if check_line:
-                if len(current_line.pixel_lines) > minimum_height:
+                if current_line.height > minimum_height:
                     lines.append(current_line)
                 current_line = LineInfo(idx)
             current_line.add_pixel_line(pixel_line)
@@ -260,12 +279,15 @@ class PageInfo(object):
         lines = []
         minimum_jump = self.width
         minimum_height = 1
+        best_lines = []
         while len(lines) != len(self.lines) and 0 < minimum_jump:
             lines = self.chop_by_leap_forward(minimum_jump, minimum_height, header_offset)
-            # minimum height is 20% of average
-            minimum_height = sum([line.height for line in lines])/(len(lines)*5)
+            if abs(len(lines) - len(self.lines)) < abs(len(best_lines) - len(self.lines)):
+                best_lines = lines
+            # minimum height is 80% of average
+            minimum_height = sum([line.height for line in lines])/(len(lines)*2)
             minimum_jump -= 10
-        return lines
+        return best_lines
 
     def chopped_version(self, output_file_path, header_offset=0):
         """ Outputs one file per line.
@@ -276,31 +298,38 @@ class PageInfo(object):
         im = Image.open(self.path_to_image)
         width, height = im.size
         for idx, line in enumerate(self.line_guess(header_offset)):
-            image_page_b = im.crop((0, line.y, width, line.y + line.height))
-            image_page_b.save(output_file_path.format(idx))
+            line_image = line.image(im)
+            line_image.save(output_file_path.format(idx))
 
 class LineInfo(object):
     def __init__(self, y):
-        self.pixel_lines = []
         self.height = 0
         self.left_margin = None
         self.y = y
         self.width = None
 
     def add_pixel_line(self, pixel_line):
-        self.pixel_lines.append(pixel_line)
-        self.height = len(self.pixel_lines)
+        self.height += 1
         if self.left_margin:
             self.left_margin = min(self.left_margin, pixel_line.left_margin)
         else:
             self.left_margin = pixel_line.left_margin
         if not self.width:
             self.width = pixel_line.full_length
-    def blank(self):
-        for pixel_line in self.pixel_lines:
-            if not pixel_line.blank:
-                return False
         return True
+
+    def image(self, image, buffer_=0):
+        """ Returns slice of image associated with this line.
+
+        parameters:
+        image - Image object of the page
+        buffer = multiple of line height to include
+        """
+        width, height = image.size
+        top = max(0, self.y - (buffer_*self.height))
+        bottom = min(height, self.y + self.height + (buffer_*self.height))
+        return image.crop((0, top, width, bottom))
+        
 
 class PixelLineInfo(object):
     """ Information about a given line of pixels."""

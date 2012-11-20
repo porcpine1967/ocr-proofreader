@@ -3,6 +3,8 @@ from argparse import ArgumentParser
 import codecs
 from collections import Counter
 from ConfigParser import ConfigParser
+import csv
+import Image
 import os
 import re
 import shutil
@@ -13,14 +15,65 @@ import process_pdf
 import document_builder
 import line_manager
 import spell_checker
-import gui
+#import gui
 
 def test():
     """ Whatever is being worked on."""
     """ Currently, either proper nouns or cross-line fixes."""
-    possible_headers()
+    page_info()
+#   possible_headers()
 #   remove_headers()
 #   proper_names()
+#    check_if_ok()
+#    examine_slices()
+def examine_slices():
+    page_nbr = 431
+    im = Image.open('images/pages/{}.pbm'.format(page_nbr))
+    with open('working/page_info.csv', 'rb') as f:
+        reader = csv.reader(f)
+        for idx, row in enumerate(reader):
+            if int(row[0]) == page_nbr:
+                line_info = line_manager.LineInfo(int(row[3]))
+                line_info.height = int(row[1])
+                line_info.left_margin = int(row[2])
+                line_info.width = int(row[4])
+                im2 = line_info.image(im)
+                im2.save('test_{}.jpg'.format(idx), 'jpeg')
+    
+
+def check_if_ok():
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang))
+        )
+    lm.load('text/clean')
+    good = []
+    with codecs.open('working/maybe_ok.txt', mode='rb', encoding='utf-8') as f:
+        for l in f:
+            word = l.split()[0]
+            page_nbr, line, line_info = lm.find_word(word)
+            if line:
+                print 'Page:', page_nbr
+                print 'Word:', word
+                print line.text
+                if line_info:
+                    im = Image.open('images/pages/{}.pbm'.format(page_nbr))
+                    im2 = line_info.image(im, 1)
+                    im2.save('test.jpg', 'jpeg')
+                result = raw_input()
+                if result == 'y':
+                    good.append(word)
+                elif result == 'q':
+                    break
+
+    print good
+
+def page_info():
+    lang = get_lang()
+    dict_ = './dict.{}.pws'.format(lang)
+    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.page_image_info('text/raw', 'images/pages')
 def possible_headers():
     lang = get_lang()
     dict_ = './dict.{}.pws'.format(lang)
@@ -275,19 +328,13 @@ def aspell_clean():
         if fn.endswith('.txt'):
             for bad_word in checker.check_document('text/clean/{}'.format(fn)):
                 bad_word_ctr[bad_word] += 1
-    for bad_word, count in bad_word_ctr.most_common():
-        if not starts_with_cap.match(bad_word):
-            continue
-        print '{:>3}: {}'.format(count, bad_word)
-        print 'Add to dictionary? (y)es, (n)o, (q)uit'
-        sys.stdout.write('> ')
-        result = raw_input()
-        if result.lower().startswith('y') or result.lower().startswith('a'):
-            with codecs.open(dict_, mode='ab', encoding='utf-8') as f:
-                f.write(bad_word)
-                f.write('\n')
-        elif result.lower().startswith('q'):
-            break
+    with codecs.open('working/maybe_ok.txt', mode='wb', encoding='utf-8') as f:
+        for bad_word, count in bad_word_ctr.most_common():
+            if starts_with_cap.match(bad_word):
+                f.write(u'{} ({})\n'.format(spell_checker._decode(bad_word), count))
+        for bad_word, count in bad_word_ctr.most_common():
+            if not starts_with_cap.match(bad_word):
+                f.write(u'{} ({})\n'.format(spell_checker._decode(bad_word), count))
         
 def aspell_run(start, end):
     lang = get_lang()

@@ -3,11 +3,13 @@
 
 from collections import Counter, defaultdict
 import codecs
+import csv
 import os
 import re
 import sys
 
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
+from document_builder import LineInfo
 
 # matching functions
 has_digit = re.compile('\d', re.UNICODE).search
@@ -73,6 +75,26 @@ class LineManager(object):
 
     def load(self, raw_file_dir):
         """ Creates lines out of all the lines in a directory."""
+        line_infos = defaultdict(lambda:[])
+        if os.path.exists('working/page_info.csv'):
+            with open('working/page_info.csv', 'rb') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    line_info = LineInfo(int(row[3]))
+                    line_info.height = int(row[1])
+                    line_info.left_margin = int(row[2])
+                    line_info.width = int(row[4])
+                    line_infos[row[0]].append(line_info)
+        headers = set()
+        if os.path.exists('working/headers.txt'):
+            with open('working/headers.txt', 'rb') as f:
+                for l in f:
+                    try:
+                        headers.add(l.split('|')[0])
+                    except:
+                        pass
+
+
         for fn in sorted(os.listdir(raw_file_dir), key=lambda x: int(os.path.splitext(x)[0])):
             
 	    basename, ext = os.path.splitext(fn)
@@ -84,7 +106,7 @@ class LineManager(object):
             with codecs.open('{}/{}'.format(raw_file_dir, fn), mode='r', encoding='utf-8') as f:
                 if self.verbose:
                     print 'Loading page {:>3}'.format(basename)
-                self.pages[basename] = []
+                self.pages[basename] = Page(basename, fn in headers, line_infos[basename])
                 idx = 1
                 for l in f:
                     line = Line(l.strip(), idx, self.spell_checker)
@@ -155,10 +177,25 @@ class LineManager(object):
                     found = True
         return '0', None
 
+    def find_word(self, word):
+        """ Finds the first use of a word in the document.
+
+        Returns the page number, line object, and line_info object.
+        """
+        line = line_info = None
+        for page_nbr in self.page_numbers:
+            try:
+                line, line_info = self.pages[page_nbr].find_word(word)
+                break
+            except NoWordException:
+                continue
+        return page_nbr, line, line_info
+                
     def line_context(self, page_nbr, check_line):
         """ Returns text of lines above and below."""
         before_line = '[PAGE BEGIN]'
         after_line = '[PAGE END]'
+        idx = 0
         lines = self.pages[page_nbr]
         try:
             idx = lines.index(check_line)
@@ -170,14 +207,14 @@ class LineManager(object):
                 pass
         except ValueError:
             pass
-        return before_line, after_line
+        return before_line, after_line, idx
 
     def interactive_fix(self):
         replaceable = (re.compile(u'({}+)["\u00B0]+({}+)'.format(REGEX_LETTER, REGEX_LETTER), flags=re.UNICODE), r"\1'\2")
         page_nbr, line = self.next_line_to_check(self.start_page, None)
         while line:
             to_check = line.should_check()
-            before_line, after_line = self.line_context(page_nbr, line)
+            before_line, after_line, line_nbr = self.line_context(page_nbr, line)
             print '\n\n\n\n\n'
             print 'Something odd on page {} line {}'.format(page_nbr, line.line_nbr)
             print u'*** {}'.format(before_line)
@@ -267,6 +304,7 @@ class LineManager(object):
                     """
                     f.write(line.text)
                     f.write('\n')
+
 
     def write_pages(self, clean_file_dir, fix=True):
         try:
@@ -441,6 +479,43 @@ class SubstitutionManager(object):
         """ Replaces numbers with letters and makes sure
         they become real words."""
         return self.update_words(line)
+
+class NoWordException(Exception):
+    pass
+
+class Page(object):
+    def __init__(self, nbr, has_header=False, line_infos=[]):
+        self.number = nbr
+        self.lines = []
+        self.has_header = has_header
+        self.line_infos = line_infos
+
+    def find_word(self, word):
+        """ Returns line and line info that contain this word.
+        
+        throws NoWordException if none found
+        """
+        for idx, line in enumerate(self.lines):
+            if word in line.text:
+                try:
+                    if self.has_header:
+                        line_info = self.line_infos[idx + 1]
+                    else:
+                        line_info = self.line_infos[idx]
+                except IndexError:
+                    line_info = None
+                return line, line_info
+        raise NoWordException()
+
+    def __iter__(self):
+        return self.lines.__iter__()
+
+    def __len__(self):
+        return len(self.lines)
+
+    def append(self, line):
+        self.lines.append(line)
+
 
 class Word(object):
     """ Actually, the holder of a space-separated chunk of text."""

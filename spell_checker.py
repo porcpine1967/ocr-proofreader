@@ -5,6 +5,7 @@
 """
 
 import codecs
+import os
 import re
 from subprocess import Popen, PIPE
 
@@ -164,6 +165,8 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(u'rf({}{{2,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"n'\1", u'rf-to-n\'',),
             # replace x i-diaeresis with x'i
             (re.compile(u'\\b([dlns])\u00EF', flags=re.UNICODE), r"\1'i", u'x-i-diaeresis-to-x\'i',),
+            # l to !
+            (re.compile(u'({}{{3,}})[li]\\b'.format(REGEX_LETTER), flags=re.UNICODE), r'\1!', u'l-or-i-to-!',),
         ])
 
 	self.punctuation_fixes.extend([
@@ -439,7 +442,7 @@ class AspellSpellChecker(BaseSpellChecker):
         super(AspellSpellChecker, self).__init__()
         self.lang = lang
         self.aspell_command = ['aspell', 'list', '-l', self.lang,]
-        if dict_path:
+        if dict_path and os.path.exists(dict_path):
             self.aspell_command.append('-p')
             self.aspell_command.append(dict_path)
             self.dict_path = dict_path
