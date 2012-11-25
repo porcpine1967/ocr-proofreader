@@ -6,6 +6,7 @@ import Image
 import wx
 import wx.lib.rcsizer as rcs
 
+import document_builder
 import line_manager
 import spell_checker
 
@@ -78,7 +79,7 @@ class BaseFrame(wx.Frame):
                 len(self.lm.pages[self.page_nbr]),
                 self.lm.average_lines_per_page)
             self.imageCtrl.SetBitmap(self.bitmap_fetcher.get_bitmap(self.line.line_nbr, 180))
-            before_line, after_line = self.lm.line_context(self.page_nbr, self.line)
+            before_line, after_line, idx = self.lm.line_context(self.page_nbr, self.line)
             text = '\n'.join((before_line, self.line.text, after_line,))
             self.sizeCtrl.SetValue(text)
             self.sizeCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))

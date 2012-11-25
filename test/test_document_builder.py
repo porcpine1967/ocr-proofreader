@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import Image
+import Image, ImageDraw
 import unittest
 import os
 
@@ -73,9 +73,3 @@ class DocumentBuilderTester(unittest.TestCase):
         for pixel in im2.getdata():
             derived_pixels.append(pixel)
         self.assertEquals(expected_pixels, derived_pixels)
-
-#   def test_line_column(self):
-#       pi = document_builder.PageInfo('{}/test_paragraphs/images/straight.pbm'.format(PATH),
-#                                       '{}/test_paragraphs/text/straight.txt'.format(PATH))
-#       for num, column in sorted(pi.pixel_columns.items(), key=lambda x: x[0]): 
-#           print '{:>4}: {:.3f}'.format(num, column.density())

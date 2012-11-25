@@ -40,6 +40,8 @@ class BaseSpellFixer(object):
             # weird combined f
             (re.compile(u'\ufb01', flags=re.UNICODE), 'fi', 'weird-fi',),
             (re.compile(u'\ufb02', flags=re.UNICODE), 'fl', 'weird-fl',),
+            # weird small x
+            (re.compile(u'\xd7', flags=re.UNICODE), 'x', 'weird-x',),
             # smart quotes and accents to dumb quotes
             (re.compile(u'[\u2019\u2018\u0060\u00B4]', flags=re.UNICODE), "'", 'smart-to-single-quote',),
             (re.compile(u'[\u201c\u201d]', flags=re.UNICODE), '"', 'smart-to-double-quote',),
@@ -48,6 +50,7 @@ class BaseSpellFixer(object):
             (re.compile(u'I-[Il]({}+)'.format(REGEX_SMALL), flags=re.UNICODE), r'H\1', 'to-H',),
         ]
         self.letter_fixes = [
+            (re.compile(r'\\/', flags=re.UNICODE), r'v', u'slashes-to-v',),
             (re.compile(r'rn', flags=re.UNICODE), r'm', u'rn-to-m',),
             (re.compile(r'm', flags=re.UNICODE), r'rn', u'm-to-rn',),
             (re.compile(r'ri', flags=re.UNICODE), r'n', u'ri-to-n',),

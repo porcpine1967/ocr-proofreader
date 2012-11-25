@@ -15,16 +15,15 @@ import process_pdf
 import document_builder
 import line_manager
 import spell_checker
-#import gui
+import gui
 
 def test():
     """ Whatever is being worked on."""
     """ Currently, either proper nouns or cross-line fixes."""
-    page_info()
-#   possible_headers()
+#   page_info()
 #   remove_headers()
 #   proper_names()
-#    check_if_ok()
+#   check_if_ok()
 #    examine_slices()
 def examine_slices():
     page_nbr = 431
@@ -48,8 +47,13 @@ def check_if_ok():
         )
     lm.load('text/clean')
     good = []
+    skipped = []
+    skipping = False
     with codecs.open('working/maybe_ok.txt', mode='rb', encoding='utf-8') as f:
         for l in f:
+            if skipping:
+                skipped.append(l)
+                continue
             word = l.split()[0]
             page_nbr, line, line_info = lm.find_word(word)
             if line:
@@ -58,15 +62,24 @@ def check_if_ok():
                 print line.text
                 if line_info:
                     im = Image.open('images/pages/{}.pbm'.format(page_nbr))
-                    im2 = line_info.image(im, 1)
+                    im2 = line_info.image(im, 2)
                     im2.save('test.jpg', 'jpeg')
                 result = raw_input()
                 if result == 'y':
                     good.append(word)
+                elif result == 's':
+                    skipped.append(l)
                 elif result == 'q':
-                    break
+                    skipping = True
+                    skipped.append(l)
 
-    print good
+    with codecs.open('working/good.txt', mode='ab', encoding='utf-8') as f:
+        for g in good:
+            f.write(u'{}\n'.format(g))
+
+    with codecs.open('working/maybe_ok.txt', mode='wb', encoding='utf-8') as f:
+        for skip in skipped:
+            f.write(skip)
 
 def page_info():
     lang = get_lang()
@@ -388,6 +401,7 @@ def run():
         'clean': 'c',
         'fix': 'f',
         'html': 'h',
+        'headers': 'hf',
         'gui': 'g',
         'fix_spells': 'fs',
         'fix_all': 'fa',
@@ -457,6 +471,8 @@ def run():
         cross_line_fixes()
     elif args.action in ('fix_spells', 'ft',):
         fix_spells()
+    elif args.action in ('headers', 'hf',):
+        possible_headers()
     elif args.action in ('fix_lines', 'ft',):
         cross_line_fixes()
     elif args.action in ('html', 'h',):

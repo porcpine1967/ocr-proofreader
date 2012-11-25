@@ -267,7 +267,7 @@ class PdfProcessor(object):
         for root in self.config.get('extract_text', 'ordered_dirnames').split():
             for f in sorted(os.listdir(root)):
                 source_file = '{}/{}'.format(root, f)
-                if source_file in ignores:
+                if f in ignores or source_file in ignores:
                     continue
                 basename, ext = os.path.splitext(f)
                 command = 'tesseract {} {} -l {}'.format(source_file, current_page, lang)

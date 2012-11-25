@@ -4,7 +4,7 @@
 import codecs
 from collections import Counter, defaultdict
 import csv
-import Image
+import Image, ImageDraw
 import os
 import re
 import sys
@@ -32,16 +32,23 @@ class SpellcheckDocMaker(object):
             return word
     def possible_headers(self, dir_):
         headers = {}
+        footers = {}
         for fn in os.listdir(dir_):
             if fn.endswith('.txt'):
+                need_header = True
                 with codecs.open('{}/{}'.format(dir_, fn), mode='r', encoding='utf-8') as f:
                     for l in f:
-                        if len(l.strip()) > 5:
-                            headers[fn] = l.strip()
-                            break
+                        line = l.strip()
+                        if len(line) > 5 and need_header:
+                            headers[fn] = line
+                        if line:
+                            footers[fn] = line
         with codecs.open('{}/headers.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for page, header in sorted(headers.items(), key=lambda x: int(x[0][:-4])):
                 f.write(u'{}|{}\n'.format(page, header))
+        with codecs.open('{}/footers.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
+            for page, footer in sorted(footers.items(), key=lambda x: int(x[0][:-4])):
+                f.write(u'{}|{}\n'.format(page, footer))
 
     def remove_possible_headers(self, dir_):
         """ Removes the headers that were not manually removed from the possible headers file."""
@@ -53,24 +60,36 @@ class SpellcheckDocMaker(object):
                     header_map[page] = header
                 except ValueError:
                     pass
+        footer_map = defaultdict(lambda : 'NOT A LINE')
+        with codecs.open('{}/footers.txt'.format(self.output_dir), mode='rb', encoding='utf-8') as f:
+            for l in f:
+                try:
+                    page, footer = l.strip().split('|', 1)
+                    footer_map[page] = footer
+                except ValueError:
+                    pass
 
         for fn in os.listdir(dir_):
             if header_map.has_key(fn):
                 header = header_map[fn]
                 match = False
-                lines = []
-                with codecs.open('{}/{}'.format(dir_, fn), mode='rb', encoding='utf-8') as f:
-                    for l in f:
-                        if match:
-                            lines.append(l.strip())
-                        elif l.strip() == header:
-                            match = True
-                if lines:
-                    with codecs.open('{}/{}'.format(dir_, fn), mode='wb', encoding='utf-8') as f:
-                        for line in lines:
-                            f.write(u'{}\n'.format(line))
-                else:
-                    raise Exception('File {} does not have its header'.format(fn))
+            else:
+                match = True
+                header = 'Not important'
+            lines = []
+            with codecs.open('{}/{}'.format(dir_, fn), mode='rb', encoding='utf-8') as f:
+                for l in f:
+                    line = l.strip()
+                    if match and line != footer_map[fn]:
+                        lines.append(line)
+                    elif line == header:
+                        match = True
+            if lines:
+                with codecs.open('{}/{}'.format(dir_, fn), mode='wb', encoding='utf-8') as f:
+                    for line in lines:
+                        f.write(u'{}\n'.format(line))
+            else:
+                raise Exception('File {} does not have its header'.format(fn))
 
 
     def make_possible_proper_name_doc(self, dir_):
@@ -202,12 +221,10 @@ class SpellcheckDocMaker(object):
         return good_changes
 
     def page_image_info(self, text_dir_, images_dir_):
-        print 'in page image info'
         with open('working/page_info.csv', 'wb') as f:
             writer = csv.writer(f)
 
             for fn in os.listdir(text_dir_):
-                print fn
                 name, extension = os.path.splitext(fn)
                 text_path = '{}/{}.txt'.format(text_dir_, name)
                 image_path = '{}/{}.pbm'.format(images_dir_, name)
@@ -271,23 +288,58 @@ class PageInfo(object):
             current_line.add_pixel_line(pixel_line)
         return lines
 
+    def line_guess_test(self, header_offset=0):
+        text_idx = 0
+        dipped = False
+        lines = []
+        for idx, pixel_line in enumerate(self.pixel_lines):
+
+            if pixel_line.density/float(len(self.lines[text_idx])) > .03:
+                lines.append(LineInfo(idx))
+        return lines
+
+    def initial_min_height(self, adjusting_factor=.5):
+        block = 0.0
+        for idx, pixel_line in enumerate(self.pixel_lines):
+            if not pixel_line.blank:
+                block += 1
+        return (block * adjusting_factor)/len(self.lines)
+
     def line_guess(self, header_offset=0):
         """ Tries to guess where the lines of text in the image are.
 
         header_offset: if there is gunk at the beginning
         you don't want to count."""
         lines = []
+        if not self.lines:
+            return lines
         minimum_jump = self.width
-        minimum_height = 1
+        minimum_height = self.initial_min_height()
         best_lines = []
-        while len(lines) != len(self.lines) and 0 < minimum_jump:
+        while len(best_lines) != len(self.lines) and 0 < minimum_jump:
             lines = self.chop_by_leap_forward(minimum_jump, minimum_height, header_offset)
             if abs(len(lines) - len(self.lines)) < abs(len(best_lines) - len(self.lines)):
                 best_lines = lines
             # minimum height is 80% of average
-            minimum_height = sum([line.height for line in lines])/(len(lines)*2)
+            minimum_height = sum([line.height for line in lines])/(len(self.lines)*2)
             minimum_jump -= 10
         return best_lines
+
+    def margin_version(self, output_file_name):
+        im = Image.open(self.path_to_image)
+        d = ImageDraw.Draw(im)
+        width, height = im.size
+        for idx, pixel_line in enumerate(self.pixel_lines):
+            d.line((0, idx, pixel_line.left_margin, idx,))
+        im.save(output_file_name)
+
+    def grid_version(self, output_file_name):
+        im = Image.open(self.path_to_image)
+        d = ImageDraw.Draw(im)
+        width, height = im.size
+        for idx, line in enumerate(self.line_guess()):
+            d.line((0, line.y, width, line.y,))
+        im.save(output_file_name)
 
     def chopped_version(self, output_file_path, header_offset=0):
         """ Outputs one file per line.
@@ -303,12 +355,14 @@ class PageInfo(object):
 
 class LineInfo(object):
     def __init__(self, y):
+	self.pixel_lines = []
         self.height = 0
         self.left_margin = None
         self.y = y
         self.width = None
 
     def add_pixel_line(self, pixel_line):
+	self.pixel_lines.append(pixel_line)
         self.height += 1
         if self.left_margin:
             self.left_margin = min(self.left_margin, pixel_line.left_margin)
@@ -317,6 +371,9 @@ class LineInfo(object):
         if not self.width:
             self.width = pixel_line.full_length
         return True
+
+    def density(self):
+        return sum([pl.density for pl in self.pixel_lines])/(len(self.pixel_lines or 1))
 
     def image(self, image, buffer_=0):
         """ Returns slice of image associated with this line.
@@ -334,12 +391,20 @@ class LineInfo(object):
 class PixelLineInfo(object):
     """ Information about a given line of pixels."""
     def __init__(self, data):
-        self.full_length = len(data)
-        if 0 in data:
-            self.left_margin = data.index(0)
+	if 255 in data:
+	    self.threshold = data.index(255)
+        else:
+            self.threshold = 0
+        if 0 in data[self.threshold:]:
+            self.left_margin = data[self.threshold:].index(0) + self.threshold
             self.blank = False
         else:
-            self.left_margin = self.full_length
+            self.left_margin = len(data)
             self.blank = True
-        self.density = float(data.count(0))/self.full_length
+        self.full_length = len(data[self.left_margin:])
+        if self.blank:
+            self.density = 0
+        else:
+            self.density = float(data.count(0))/self.full_length
+
 

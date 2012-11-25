@@ -140,7 +140,7 @@ class LineManager(object):
                     return start_page_nbr, hold_line
                 elif self.pages.has_key(str(int(start_page_nbr) - 1)):
                     page_nbr = str(int(start_page_nbr) - 1)
-                    return page_nbr, self.pages[page_nbr][-1]
+                    return page_nbr, self.pages[page_nbr].lines[-1]
                 else:
                     return start_page_nbr, start_line
             else:
@@ -196,7 +196,7 @@ class LineManager(object):
         before_line = '[PAGE BEGIN]'
         after_line = '[PAGE END]'
         idx = 0
-        lines = self.pages[page_nbr]
+        lines = self.pages[page_nbr].lines
         try:
             idx = lines.index(check_line)
             if idx > 0:
@@ -496,7 +496,8 @@ class Page(object):
         throws NoWordException if none found
         """
         for idx, line in enumerate(self.lines):
-            if word in line.text:
+#           if word in line.text:
+            if re.search(u'\\b{}\\b'.format(word), line.text, flags=re.UNICODE):
                 try:
                     if self.has_header:
                         line_info = self.line_infos[idx + 1]
