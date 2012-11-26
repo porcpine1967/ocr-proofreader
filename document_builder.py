@@ -387,6 +387,13 @@ class LineInfo(object):
         bottom = min(height, self.y + self.height + (buffer_*self.height))
         return image.crop((0, top, width, bottom))
         
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(
+                            self.height,
+                            self.left_margin,
+                            self.y,
+                            self.width)
+
 
 class PixelLineInfo(object):
     """ Information about a given line of pixels."""

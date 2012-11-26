@@ -25,6 +25,13 @@ def test():
 #   proper_names()
 #   check_if_ok()
 #    examine_slices()
+
+def examine_page(page_nbr):
+    p = document_builder.PageInfo(
+        'images/pages/{}.pbm'.format(page_nbr),
+        'text/raw/{}.txt'.format(page_nbr)
+        )
+    p.grid_version('page_{}.pbm'.format(page_nbr))
 def examine_slices():
     page_nbr = 431
     im = Image.open('images/pages/{}.pbm'.format(page_nbr))
@@ -406,6 +413,7 @@ def run():
         'fix_spells': 'fs',
         'fix_all': 'fa',
         'fix_lines': 'fl',
+        'page_grid': 'pg',
         'test': 't',
     }
     parser = ArgumentParser(
@@ -435,7 +443,10 @@ def run():
         default=False,
         dest='verbose',
         help='Verbose: print out lots or little')
-
+    parser.add_argument('-page-number', type=int,
+        default='-1',
+        dest='page_nbr',
+        help='Page number for page grid')
     args = parser.parse_args()
     acceptable_actions = [item for pair in actions.items() for item in pair]
     if args.action not in acceptable_actions:
@@ -443,6 +454,11 @@ def run():
         print ', '.join(actions.keys())
     elif args.action in ('new', 'n',):
         new()
+    elif args.action in ('page_grid', 'pg',):
+        if args.page_nbr < 0:
+            print 'Need a -page-number'
+        else:
+            examine_page(args.page_nbr)
     elif args.action in ('extract_all', 'e',):
         extract_images(args.verbose)
         extract_text(args.verbose)

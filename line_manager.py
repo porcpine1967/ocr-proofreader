@@ -160,7 +160,7 @@ class LineManager(object):
                     found = True
         return '0', None
         
-    def next_line_to_check(self, start_page_nbr, start_line):
+    def next_line_to_check(self, start_page_nbr, start_line, log_bad=False):
         """ Takes a page number and line and returns the next 
             page_nbr and line that should be checked.
 
@@ -171,7 +171,7 @@ class LineManager(object):
                 continue
             lines = self.pages[page_nbr]
             for line in lines:
-                if found and line.should_check():
+                if found and line.should_check(log_bad):
                     return page_nbr, line
                 elif line == start_line:
                     found = True
@@ -382,8 +382,9 @@ class Line(object):
 	self.words = []
         self._built = False
         self.manual_fix = False
+	self.line_info = None
 
-    def should_check(self):
+    def should_check(self, log_bad=False):
         """ Returns a list of words that should be checked."""
         self.build_words()
         to_check = []
@@ -393,6 +394,10 @@ class Line(object):
             # Don't add if just a hyphen alone
             elif False and word.hyphenated and len(word.text) > 1:
                 to_check.append(word)
+	if to_check and log_bad:
+            with codecs.open('working/good.txt', mode='ab', encoding='utf-8') as f:
+                for w in to_check:
+                    f.write(u'{}\n'.format(w.text))
         return to_check
 
     def set_text(self, text):
@@ -515,6 +520,14 @@ class Page(object):
         return len(self.lines)
 
     def append(self, line):
+        try:
+            if self.has_header:
+                line.line_info = self.line_infos[len(self.lines) + 1]
+            else:
+                line.line_info = self.line_infos[len(self.lines)]
+        except IndexError:
+            if self.line_infos:
+                line.line_info = self.line_infos[-1]
         self.lines.append(line)
 
 
