@@ -6,6 +6,12 @@ import Image
 import wx
 import wx.lib.rcsizer as rcs
 
+try:
+    import aspell
+    CAN_ASPELL = True
+except ImportError:
+    CAN_ASPELL = False
+
 import document_builder
 import line_manager
 import spell_checker
@@ -30,14 +36,17 @@ class BaseFrame(wx.Frame):
         self.page_image = None
         self.line = None
         self.repeating = False
+        self.errors = []
+        self.speller = None
 	# Make Panel
 	self.panel = wx.Panel(self, -1)
         self.current_text = rcs.RowColSizer()
 	self.pageCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, str(self.page_nbr), 
             size=(40, 20,), style=wx.TE_READONLY)
-	self.sizeCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, '', 
+	self.linesCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, '', 
             size=(WIDTH - 100,80,), style=wx.TE_MULTILINE|wx.TE_READONLY)
-        self.current_text.Add(wx.StaticText(self.panel, wx.ID_ANY, 'Page'), row=1, col=1)
+        self.errorsCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, '',
+            size=(WIDTH - 100, 40), style=wx.TE_READONLY)
 	self.editCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, '', 
             size=(WIDTH - 100, 40,), style=wx.TE_PROCESS_ENTER)
         self.imageCtrl = wx.StaticBitmap(self.panel, wx.ID_ANY, 
@@ -45,22 +54,26 @@ class BaseFrame(wx.Frame):
 
 
         self.Bind(wx.EVT_TEXT_ENTER, self.OnEdit, self.editCtrl)
+        self.current_text.Add(wx.StaticText(self.panel, wx.ID_ANY, 'Page'), row=1, col=1)
         self.current_text.Add(self.pageCtrl, row=1, col=2)
-        self.current_text.Add(self.sizeCtrl, row=2, col=2, rowspan=4)
-        self.current_text.Add(self.editCtrl, row=6, col=2)
-        self.current_text.Add(self.imageCtrl, row=7, col=2)
+        self.current_text.Add(self.linesCtrl, row=2, col=2, rowspan=4)
+        self.current_text.Add(self.errorsCtrl, row=6, col=2)
+        self.current_text.Add(self.editCtrl, row=7, col=2)
+        self.current_text.Add(self.imageCtrl, row=8, col=2)
 
     def OnEdit(self, event):
         self.line.set_text(event.GetString())
-        self.OnNextLine(None)
+        self.OnPreviousLine(None)
 
     def OnPreviousLine(self, event):
+        self.errors = []
         old_page_nbr = self.page_nbr
         self.page_nbr, self.line = self.lm.previous_line(self.page_nbr, self.line)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
         
     def OnNextLine(self, event):
+        self.errors = []
         old_page_nbr = self.page_nbr
         self.page_nbr, self.line = self.lm.next_line(self.page_nbr, self.line)
         self.pageCtrl.SetValue(str(self.page_nbr))
@@ -68,46 +81,67 @@ class BaseFrame(wx.Frame):
         
     def OnNextBadLine(self, event):
         old_page_nbr = self.page_nbr
-        self.page_nbr, self.line = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating)
+        self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
 
     def update_line(self, old_page_nbr):
+        self.errorsCtrl.SetValue(u', '.join(self.errors))
         if self.line:
             if old_page_nbr != self.page_nbr:
                 self.page_image = Image.open('images/pages/{}.pbm'.format(self.page_nbr))
             self.imageCtrl.SetBitmap(pil_image_to_scaled_image(self.line.line_info.image(self.page_image, 1), WIDTH - 100))
             before_line, after_line, idx = self.lm.line_context(self.page_nbr, self.line)
             text = '\n'.join((before_line, self.line.text, after_line,))
-            self.sizeCtrl.SetValue(text)
-            self.sizeCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
+            self.linesCtrl.SetValue(text)
+            self.linesCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
             self.editCtrl.SetValue(self.line.text)
         else:
             self.repeating = True
-            self.sizeCtrl.SetValue('')
+            self.linesCtrl.SetValue('')
             self.editCtrl.SetValue('')
 
     def set_line_manager(self, line_manager_):
         if line_manager_:
             self.lm = line_manager_
+            if CAN_ASPELL:
+                self.spell_checker = line_manager_.spell_checker
+                self.speller = aspell.Speller('lang', line_manager_.spell_checker.lang)
+
             next_error_button = wx.Button(self.panel, wx.ID_ANY, label='Next Error', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnNextBadLine, next_error_button)
             next_error_button.SetDefault()
             next_error_button.SetSize(next_error_button.GetBestSize())
             self.current_text.Add(next_error_button, row=2, col=1)
+
             next_line_button = wx.Button(self.panel, wx.ID_ANY, label='Next Line', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnNextLine, next_line_button)
             next_line_button.SetDefault()
             next_line_button.SetSize(next_line_button.GetBestSize())
             self.current_text.Add(next_line_button, row=3, col=1)
+
             previous_line_button = wx.Button(self.panel, wx.ID_ANY, label='Prev Line', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnPreviousLine, previous_line_button)
             previous_line_button.SetDefault()
             previous_line_button.SetSize(previous_line_button.GetBestSize())
             self.current_text.Add(previous_line_button, row=4, col=1)
+
+            if self.speller:
+                add_to_dictionary_button = wx.Button(self.panel, wx.ID_ANY, label='+ to Dict', size=(90, 30))
+                self.Bind(wx.EVT_BUTTON, self.OnAddToDict, add_to_dictionary_button)
+                add_to_dictionary_button.SetDefault()
+                add_to_dictionary_button.SetSize(add_to_dictionary_button.GetBestSize())
+                self.current_text.Add(add_to_dictionary_button, row=5, col=1)
             # Sizers for layout
             self.panel.SetSizerAndFit(self.current_text)
-
+    def OnAddToDict(self, event):
+        if self.line:
+            errors = self.spell_checker.check_line(self.line.text)
+            for word in errors:
+                self.speller.addtoPersonal(word)
+            self.speller.saveAllwords()
+            self.line.recheck()
+            self.OnPreviousLine(None)
 
 def pil_image_to_scaled_image(pil_image, desired_width):
     bytes_ = []

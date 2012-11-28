@@ -162,7 +162,7 @@ class LineManager(object):
         
     def next_line_to_check(self, start_page_nbr, start_line, log_bad=False):
         """ Takes a page number and line and returns the next 
-            page_nbr and line that should be checked.
+            page_nbr and line that should be checked and error list.
 
         Starts at beginning if page or line blank."""
         found = not bool(start_page_nbr and start_line)
@@ -171,11 +171,13 @@ class LineManager(object):
                 continue
             lines = self.pages[page_nbr]
             for line in lines:
-                if found and line.should_check(log_bad):
-                    return page_nbr, line
+                if found:
+                    errors = line.should_check(log_bad)
+                    if errors:
+                        return page_nbr, line, errors
                 elif line == start_line:
                     found = True
-        return '0', None
+        return '0', None, []
 
     def find_word(self, word):
         """ Finds the first use of a word in the document.
@@ -390,15 +392,20 @@ class Line(object):
         to_check = []
         for word in self.words:
             if word.misspelled or word.odd_punctuation:
-                to_check.append(word)
+                to_check.append(word.text)
             # Don't add if just a hyphen alone
             elif False and word.hyphenated and len(word.text) > 1:
-                to_check.append(word)
+                to_check.append(word.text)
 	if to_check and log_bad:
             with codecs.open('working/good.txt', mode='ab', encoding='utf-8') as f:
                 for w in to_check:
-                    f.write(u'{}\n'.format(w.text))
+                    f.write(u'{}\n'.format(w))
         return to_check
+
+    def recheck(self):
+        self._built = False
+        self.words = []
+        self.build_words()
 
     def set_text(self, text):
         self.text = text
