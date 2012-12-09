@@ -114,6 +114,20 @@ class SpellCheckTester(unittest.TestCase):
             )
         for preceding_word, test, expected in to_test:
             self.assertEquals(sc.proper_noun(preceding_word, test), expected, '{} properness should be {}'.format(test, expected))
-        
+    def test_french_check(self):
+        to_test = (
+            ('.Vaurais', "J'aurais"),
+            ('eXchange', 'exchange'),
+        )        
+                    
+        sc = spell_checker.StubSpellChecker([])
+        sc.fixer = spell_checker.FrenchSpellFixer()
+        for word, variation in to_test:
+            tvs = sc.transformed_variations(word)
+            self.assertTrue(variation in [s[0] for s in tvs])        
+    def test_strict_check(self):
+        sc = spell_checker.StubSpellChecker([])
+        sc.fixer = spell_checker.FrenchSpellFixer()
+        self.assertEquals(set('f'), sc.strict_check('f'))
 if __name__ == '__main__':
     unittest.main()

@@ -3,6 +3,7 @@
 
 from collections import Counter, defaultdict
 import codecs
+from ConfigParser import NoOptionError
 import csv
 import os
 import re
@@ -160,7 +161,7 @@ class LineManager(object):
                     found = True
         return '0', None
         
-    def next_line_to_check(self, start_page_nbr, start_line, log_bad=False):
+    def next_line_to_check(self, start_page_nbr, start_line, log_bad=False, strict=False):
         """ Takes a page number and line and returns the next 
             page_nbr and line that should be checked and error list.
 
@@ -172,7 +173,7 @@ class LineManager(object):
             lines = self.pages[page_nbr]
             for line in lines:
                 if found:
-                    errors = line.should_check(log_bad)
+                    errors = line.should_check(log_bad, strict)
                     if errors:
                         return page_nbr, line, errors
                 elif line == start_line:
@@ -279,35 +280,47 @@ class LineManager(object):
             line.rebuild()
             page_nbr, line = self.next_line_to_check(self.start_page, line)
 
-    def write_html(self, book_config):
-	self.calculate_average_length()
+    def write_html(self, book_config, last_page, last_line):
         html_file_name = book_config.get('metadata', 'html_file')
         title = book_config.get('metadata', 'title')
         author = book_config.get('metadata', 'author')
-        non_letter = re.compile('\W$', flags=re.UNICODE)
-        with codecs.open(html_file_name, mode='w', encoding='utf-8') as f:
-            f.write(HTML_HEADER.format(title, title, author))
-            last_line_short = False
+        try:
+            last_written_page = book_config.getint('process', 'last_html_page')
+            last_written_line = book_config.getint('process', 'last_html_line')
+        except NoOptionError:
+            last_written_page = -1
+            last_written_line = -1
+
+        with codecs.open(html_file_name, mode='a', encoding='utf-8') as f:
+            if last_written_page < 0:
+                f.write(HTML_HEADER.format(title, title, author))
+            hit_start_line = hit_start_page = False
+            hit_last_line = hit_end_page = False
             for page_nbr in self.page_numbers:
-                if self.verbose:
-                    print 'Writing page {:3}'.format(page_nbr)
-                f.write('<!-- Page {} -->\n'.format(page_nbr))
-                for line in self.pages[page_nbr]:
-                    
-                    this_line_short = self.average_length > len(line.text) and bool(non_letter.search(line.text))
-                    if last_line_short: # and this_line_short:
-                        f.write('<p>\n')
-                    last_line_short = this_line_short
-                    """
-                    if self.spell_checker.check_line(line.text):
-                        f.write('<!-- Spelling Errors: line {} -->\n'.format(line.line_nbr))
-                    if line.has_odd_punctuation():
-                        f.write('<!-- Odd Punctuation: line {} -->\n'.format(line.line_nbr))
-                    """
-                    f.write(line.text)
-                    f.write('\n')
-
-
+                if hit_last_line:
+                    break
+                if int(page_nbr) >= last_page:
+                    hit_end_page = True
+                if hit_start_page:
+                    f.write('<!-- Page {} -->\n'.format(page_nbr))
+                    if self.verbose:
+                        print 'Writing page {:3}'.format(page_nbr)
+                if int(page_nbr) > last_written_page:
+                    hit_start_page = True
+                if hit_start_page:
+                    for line in self.pages[page_nbr]:
+                        if hit_start_page and not hit_start_line:
+                            if line.line_nbr > last_written_line:
+                                hit_start_line = True
+                        if hit_start_line:
+                            f.write(line.text)
+                            f.write('\n')
+                        if hit_end_page and line.line_nbr >= last_line:
+                            print 'hll true'
+                            hit_last_line = True
+                            break
+        
+        
     def write_pages(self, clean_file_dir, fix=True):
         try:
             os.makedirs(clean_file_dir)
@@ -330,14 +343,7 @@ class LineManager(object):
                         f.write(line.text)
                         f.write('\n')
 
-    def fix_line(self, line):
-        sm = SubstitutionManager(self.spell_checker)
-        if line.valid:
-            line.text = sm.update_single_characters(line.text)
-            line.text = sm.update_numbers(line.text)
-            line.text = sm.update_words(line.text)
-
-    def fix_lines(self):
+    def join_lines(self):
         last_line = None
         for page_nbr in self.page_numbers:
             if int(page_nbr) < self.start_page:
@@ -351,9 +357,22 @@ class LineManager(object):
             for line in self.pages[page_nbr]:
                 if line.valid:
                     self.fix_hyphen((last_line, line,))
-                    line.fix()
                     if line.text.strip():
                         last_line = line
+
+    def fix_lines(self):
+        for page_nbr in self.page_numbers:
+            if int(page_nbr) < self.start_page:
+                continue
+            if self.end_page and int(page_nbr) > self.end_page:
+                if self.verbose:
+                    print page_nbr, self.end_page
+                return
+            if self.verbose:
+                print 'fixing page {:>3}'.format(page_nbr)
+            for line in self.pages[page_nbr]:
+                if line.valid:
+                    line.fix()
 
     def quick_fix(self):
         """ Replaces all the must-replace characters."""
@@ -368,9 +387,10 @@ class LineManager(object):
         word_1 = lines[0].last_word()
         word_2 = lines[1].first_word()
         fix = self.spell_checker.check_join(word_1, word_2)
+#       print word_1, word_2, fix
         if fix:
-            lines[0].replace_last_word(fix)
-            lines[1].pop_first_word()
+            lines[0].pop_last_word()
+            lines[1].replace_first_word(fix)
                 
 class Line(object):
     """ Manages individual lines of a book. """
@@ -386,10 +406,15 @@ class Line(object):
         self.manual_fix = False
 	self.line_info = None
 
-    def should_check(self, log_bad=False):
+    def should_check(self, log_bad=False, strict=False):
         """ Returns a list of words that should be checked."""
         self.build_words()
-        to_check = []
+
+        if strict:
+            to_check = list(self.spell_checker.strict_check(self.text))
+        else:
+            to_check = []
+            
         for word in self.words:
             if word.misspelled or word.odd_punctuation:
                 to_check.append(word.text)
@@ -442,15 +467,14 @@ class Line(object):
     def fix(self):
 	self.spell_checker.fix_line(self)
 
-    def pop_first_word(self):
-        """ For joining hyphens, removes first word of line."""
-        self.text = u' '.join(self.text.split()[1:])
+    def pop_last_word(self):
+        """ For joining hyphens, removes last word of line."""
+        self.text = u' '.join(self.text.split()[:-1])
 
-
-    def replace_last_word(self, word):
+    def replace_first_word(self, word):
         """ For joining hyphens, puts the prefix of the word in front."""
         words = self.text.split()
-        words[-1] = word
+        words[0] = word
         self.text = u' '.join(words)
 
     def has_odd_punctuation(self):

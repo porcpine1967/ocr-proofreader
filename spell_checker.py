@@ -9,7 +9,7 @@ import os
 import re
 from subprocess import Popen, PIPE
 
-from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
+from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL, FRENCH_BAD_SINGLES
 
 begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
 ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
@@ -58,6 +58,8 @@ class BaseSpellFixer(object):
             (re.compile(r'ck', flags=re.UNICODE), u'd', u'ck-to-d',),
             (re.compile(r'cl', flags=re.UNICODE), u'd', u'cl-to-d',),
             (re.compile(r'lll\b', flags=re.UNICODE), u"'ll", u'lll-to-\'ll',),
+            (re.compile(r'lf\b', flags=re.UNICODE), u"'ff", u'lf-to-ff',),
+            (re.compile(r'fl\b', flags=re.UNICODE), u"'ff", u'fl-to-ff',),
             (re.compile(r'\bVV', flags=re.UNICODE), u'W', u'VV-to-W',),
             (re.compile(u'({})({})\\B'.format(REGEX_SMALL, REGEX_CAPITAL), flags=re.UNICODE), r'\1 \2', u'xX-to-x[space]X',),
             (re.compile(r'\Be\B', flags=re.UNICODE), u'c', u'e-to-c',),
@@ -67,12 +69,14 @@ class BaseSpellFixer(object):
             (re.compile('0', flags=re.UNICODE), u'o', u'0-to-o',),
             (re.compile('5', flags=re.UNICODE), u's', u'5-to-s',),
             (re.compile(u'\\boo({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r'co\1', 'oo-to-co',),
+            (re.compile(u'{}{}{}'.format(REGEX_SMALL, REGEX_CAPITAL, REGEX_SMALL), flags=re.UNICODE), lambda m: m.group(0).lower(), 'xXx-to-xxx'),
         ]
 	# things that need punctuation and therefore cannot be batched
 	self.punctuation_fixes = [
 
 	]
         self.odd_punctuation = [
+            re.compile(u'{}\u203a{}'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE),
             # begin paragraph directly after a letter
             re.compile(u'{}+\\('.format(REGEX_LETTER), flags=re.UNICODE),
             # ending punctuation inside a word
@@ -85,7 +89,20 @@ class BaseSpellFixer(object):
             # number-letter combinations
             re.compile(u'\\d{}'.format(REGEX_LETTER), flags=re.UNICODE),
             re.compile(u'{}\\d'.format(REGEX_LETTER), flags=re.UNICODE),
+            re.compile(r"\b1'", flags=re.UNICODE),
         ]
+	self.strict_checks = [
+#           re.compile(r'[0-9]', flags=re.UNICODE),
+            re.compile(r'-$', flags=re.UNICODE),
+            re.compile(r'<', flags=re.UNICODE),
+            re.compile(r'>', flags=re.UNICODE),
+            re.compile(u'\xbb', flags=re.UNICODE),
+            re.compile(r'_', flags=re.UNICODE),
+            re.compile(r'\*', flags=re.UNICODE),
+            re.compile(r'\[', flags=re.UNICODE),
+            re.compile(u'\xab\\S', flags=re.UNICODE),
+            re.compile(r'\. \.', flags=re.UNICODE),
+	]	
 
 class EnglishSpellFixer(BaseSpellFixer):
     def __init__(self):
@@ -158,6 +175,8 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(u'\\bF({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"l'\1", u'Fx-to-l\'x',),
             # replace starts-with-Y with l'
             (re.compile(u'\\bY({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"l'\1", u'Yx-to-l\'x',),
+            # .V to J'
+            (re.compile(u'\\.V({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"J'\1", u'.V-to-J-appos',),
             # replace - with '
             (re.compile(u'({})-({})'.format(REGEX_LETTER, REGEX_SMALL), flags=re.UNICODE), r"\1'\2", u"hyphen-to-apostrophe",),
             # replace Cce with Cc'e accent acute
@@ -170,19 +189,42 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(u'\\b([dlns])\u00EF', flags=re.UNICODE), r"\1'i", u'x-i-diaeresis-to-x\'i',),
             # l to !
             (re.compile(u'({}{{3,}})[li]\\b'.format(REGEX_LETTER), flags=re.UNICODE), r'\1!', u'l-or-i-to-!',),
+            # qu- to qu'
+            (re.compile(u'\\b([Qq]u)-({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"\1'\2", u'qu-dash-to-qu-appos',),
+            # lsnmdJ- to lsnmdJ'
+            (re.compile(u'\\b([LlsnJmd])-({}{}{{2,}})'.format(REGEX_LETTER, REGEX_SMALL), flags=re.UNICODE), r"\1'\2", u'lsnmJd-dash-to-ldsnmJ-appos',),
+            # nf- to m'
+            (re.compile(u'\\bnf({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"m'\1", u'nf-to-m-appos',),
+            # 1(-') to l(-')
+            (re.compile(u"\\b1[-']({}{}{{2,}})".format(REGEX_LETTER, REGEX_SMALL), flags=re.UNICODE), r"l'\1", u'1-dash-to-l-appos',),
         ])
 
 	self.punctuation_fixes.extend([
             # l to !
             (re.compile(u'({}{{3,}})[li]\\.\\.'.format(REGEX_LETTER), flags=re.UNICODE), r'\1!..', u'l-or-i-to-!',),
 	])
-
+	self.strict_checks.extend( [
+#           re.compile(r'"', flags=re.UNICODE),
+#           re.compile(u"\\b[bcdefghijklmnopqrstuvwxzBCDEFGHIJKLMNOPQRSTUVWXYZ]\\b[^'-]", flags=re.UNICODE),
+            re.compile(u"\\b{}\\b($|[^'-])".format(FRENCH_BAD_SINGLES), flags=re.UNICODE),
+        ])
 class BaseSpellChecker(object):
     
     def __init__(self):
         self.log_file = 'automatic_fixes.log'
         self.format_string = u'{:30} {:30} {:30} {:30}\n'
         self.line_join_fixes = {}
+
+    def strict_check(self, line):
+        """ Takes a string and returns an array of strict matches."""
+        strict_matches = set()
+        for regex in self.fixer.strict_checks:
+            m = regex.search(line)
+            if m:
+
+#               print regex.pattern
+                strict_matches.add(m.group(0))
+        return strict_matches
 
     def quick_fix(self, word):
         """ Takes a string and returns the 'quick fix' version."""
@@ -213,7 +255,8 @@ class BaseSpellChecker(object):
                 '-',
                 word[idx + 1:]
             )
-            hyphenates.append((new_word, 'hyphen-at-{}'.format(idx),))
+            if not '--' in new_word:
+                hyphenates.append((new_word, 'hyphen-at-{}'.format(idx),))
         return hyphenates
 
     def hyphenate(self, word, min_chars=3):
@@ -401,8 +444,9 @@ class BaseSpellChecker(object):
             f.write(self.format_string.format(context, expression, old_word, new_word))
 
     def check_join(self, word_a, word_b):
+        key = u'{}_{}'.format(word_a, word_b)
         try:
-            return self.line_join_fixes[u'{}_{}'.format(word_a, word_b)]
+            return self.line_join_fixes[key]
         except KeyError:
             return None
 
@@ -511,7 +555,7 @@ def _decode(word):
 
 class FileConfiguredSpellChecker(AspellSpellChecker):
     """ Uses Files created by document builder to check things."""
-    def __init__(self, lang, dict_, dir_='working'):
+    def __init__(self, lang, dict_=None, dir_='working'):
         super(FileConfiguredSpellChecker, self).__init__(lang, dict_)
         self.load_word_fixes(dir_)
         self.load_line_join_fixes(dir_)

@@ -13,6 +13,7 @@ import spell_checker
 from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL
 
 punctuation_stripper = re.compile(u'.*?({}.*{}).*'.format(REGEX_LETTER, REGEX_LETTER), re.UNICODE).match
+ends_with_hyphen = re.compile(r'.*-$', re.UNICODE).match
 
 class SpellcheckDocMaker(object):
     """ Creates documents that can later be used for spell checking."""
@@ -41,6 +42,7 @@ class SpellcheckDocMaker(object):
                         line = l.strip()
                         if len(line) > 5 and need_header:
                             headers[fn] = line
+                            need_header = False
                         if line:
                             footers[fn] = line
         with codecs.open('{}/headers.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
@@ -124,8 +126,9 @@ class SpellcheckDocMaker(object):
 	print '{} words'.format(len(word_set))
  
         words = list(word_set)
-        for idx, bad_word in enumerate(self.spell_checker.failed_words(words)):
-            if bad_word:
+        for idx, bad_word_key in enumerate(self.spell_checker.failed_words(words)):
+            if bad_word_key:
+                bad_word = words[idx]
                 bad_words.add(spell_checker._decode(bad_word))
                 bad_bad_map[words[idx]] = bad_word
 	print '{} bad words'.format(len(bad_words))
@@ -152,6 +155,12 @@ class SpellcheckDocMaker(object):
             for bad_word, cnt in still_bad.most_common():
                 f.write(u'{:>20}: {:>3}\n'.format(bad_word, cnt))
 
+    def file_sort(self, filename):
+        basename, ext = os.path.splitext(filename)
+        try:
+            return int(basename)
+        except ValueError:
+            return -1
     def make_line_join_doc(self, dir_):
         """Creates a document of fixes for cross-line joining.
         Uses all the documents found in dir_
@@ -163,16 +172,16 @@ class SpellcheckDocMaker(object):
         potential_fix_list = []
         fixes = set()
         hold_word = ''
-        for fn in os.listdir(dir_):
+        for fn in sorted(os.listdir(dir_), key=self.file_sort):
             if fn.endswith('.txt'):
                 sys.stdout.write('.')
                 with codecs.open('{}/{}'.format(dir_, fn), mode='r', encoding='utf-8') as f:
                     for l in f:
                         words = l.split()
-                        if len(words): # ignore blank lines
+                        if words: # ignore blank lines
                             joinables = spell_checker.valid_joinables(hold_word, words[0], self.spell_checker)
                             for joinable in joinables:
-                                potential_fix_list.append((hold_word, words[0], joinable,))
+                                potential_fix_list.append(PotentialLineBreakFix(hold_word, words[0], joinable, False))
                             fixes.update(joinables)
                             # blank out the hold word if only one word in line
                             if len(words) > 1:
@@ -188,16 +197,25 @@ class SpellcheckDocMaker(object):
         good_changes = {}
         good_versions, bad_words = checker.good_and_bad(fixes_array)
         print '{} good versions'.format(len(good_versions))
+        # Easy fixes: the join is already spelled correctly, so call it good
         for w in good_versions:
-            for word_1, word_2, joinable in potential_fix_list:
-                if joinable == w:
-                    good_changes[u'{}_{}'.format(word_1, word_2)] = [w,]
-        
+            for idx, fix in enumerate(potential_fix_list):
+                if fix.joinable == w:
+                    good_changes[fix.key] = [w,]
+                    fix.fixed = True 
+
+        # try to fix all the joins that might also be misspelled
         for bad_word, good_change_set in self.fixed_words(bad_words).items():
-            for word_1, word_2, joinable in potential_fix_list:
-                if joinable == bad_word:
-                    good_changes[u'{}_{}'.format(word_1, word_2)] = good_change_set
+            for idx, fix in enumerate(potential_fix_list):
+                if fix.joinable == bad_word:
+                    good_changes[fix.key] = good_change_set
+                    fix.fixed = True 
         print '{} bad versions fixed'.format(len(good_changes) - len(good_versions))
+
+        # join the words if the first word ends in hyphen anyway
+        for fix in potential_fix_list:
+            if not fix.fixed and ends_with_hyphen(fix.first_word):
+                good_changes[fix.key] = [u'{}{}'.format(fix.first_word, fix.second_word),]
 
         with codecs.open('{}/line_join_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for bad_word, good_versions in good_changes.items():
@@ -414,4 +432,12 @@ class PixelLineInfo(object):
         else:
             self.density = float(data.count(0))/self.full_length
 
-
+class PotentialLineBreakFix(object):
+    def __init__(self, first_word, second_word, joinable, fixed):
+        self.first_word = first_word
+        self.second_word = second_word
+        self.joinable = joinable
+        self.fixed = fixed
+        self.key = u'{}_{}'.format(first_word, second_word)
+    def __str__(self):
+        return u' '.join([self.key, self.joinable, str(self.fixed),])

@@ -228,7 +228,7 @@ class PdfProcessor(object):
                 continue
             image_heuristic = ImageHeuristic(verbose=self.verbose)
             destination_dir = root.replace('/raw/', '/cropped/')
-            os.makedirs(destination_dir)
+            maybe_make_dir(destination_dir)
             if self.verbose:
                 print 'Adding files from', root
             for f in files:
@@ -238,7 +238,7 @@ class PdfProcessor(object):
 
     def setup(self):
         if not os.path.exists(self.destination_dir):
-            os.makedirs('{}/images'.format(self.destination_dir))
+            maybe_make_dir('{}/images'.format(self.destination_dir))
     
     def extract_images_from_pdfs(self):
         os.chdir(self.project_path)
@@ -247,7 +247,7 @@ class PdfProcessor(object):
             if full_filename.endswith('pdf'):
                 filename, ext = os.path.splitext(full_filename)
                 working_dir = 'images/raw/{}'.format(filename)
-                os.makedirs(working_dir)
+                maybe_make_dir(working_dir)
                 shutil.copy('pdfs/{}'.format(full_filename), working_dir)
                 os.chdir(working_dir)
                 os.system('pdfimages {} {}'.format(full_filename, filename))
@@ -257,11 +257,11 @@ class PdfProcessor(object):
     def extract_text_from_pages(self, lang='eng'):
         os.chdir('{}/images/cropped'.format(self.project_path))
         linked_images_dir = os.path.abspath('{}/images/pages/'.format(self.project_path))
-        os.makedirs(linked_images_dir)
+        maybe_make_dir(linked_images_dir)
         raw_destination_dir = '{}/text/raw/'.format(self.project_path)
-        os.makedirs(raw_destination_dir)
+        maybe_make_dir(raw_destination_dir)
         clean_destination_dir = '{}/text/clean/'.format(self.project_path)
-        os.makedirs(clean_destination_dir)
+        maybe_make_dir(clean_destination_dir)
         current_page = self.config.getint('extract_text', 'start_page_number')
         ignores = self.config.get('extract_text', 'ignore_pages').split()
         for root in self.config.get('extract_text', 'ordered_dirnames').split():
@@ -279,6 +279,28 @@ class PdfProcessor(object):
                 shutil.move('{}.txt'.format(current_page), raw_destination_dir)
                 current_page += 1
         os.chdir(self.project_path)
+
+    def symlink_images(self):
+        linked_images_dir = os.path.abspath('{}/images/pages/'.format(self.project_path))
+        maybe_make_dir(linked_images_dir)
+        current_page = self.config.getint('extract_text', 'start_page_number')
+        ignores = self.config.get('extract_text', 'ignore_pages').split()
+        for root_name in self.config.get('extract_text', 'ordered_dirnames').split():
+            root = '{}/images/cropped/{}'.format(self.project_path, root_name)
+            for f in sorted(os.listdir(root)):
+                source_file = '{}/{}'.format(root, f)
+                if f in ignores or source_file in ignores:
+                    continue
+                basename, ext = os.path.splitext(f)
+                os.symlink(os.path.abspath(source_file), '{}/{}.pbm'.format(linked_images_dir, current_page))
+                current_page += 1
+        os.chdir(self.project_path)
+
+def maybe_make_dir(dir_):
+    try:
+        os.makedirs(dir_)
+    except OSError:
+        pass
 
 def run():
     parser = ArgumentParser(description="Converts pdf scans to text")

@@ -26,8 +26,8 @@ class App(wx.App):
         self.SetTopWindow(self.frame)
         return True
 
-    def set_line_manager(self, line_manager):
-        self.frame.set_line_manager(line_manager)
+    def set_line_manager(self, line_manager, strict):
+        self.frame.set_line_manager(line_manager, strict)
 
 class BaseFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
@@ -38,6 +38,7 @@ class BaseFrame(wx.Frame):
         self.repeating = False
         self.errors = []
         self.speller = None
+        self.strict = False
 	# Make Panel
 	self.panel = wx.Panel(self, -1)
         self.current_text = rcs.RowColSizer()
@@ -81,10 +82,11 @@ class BaseFrame(wx.Frame):
         
     def OnNextBadLine(self, event):
         old_page_nbr = self.page_nbr
-        self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating)
+        self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating, strict=self.strict)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
-
+    def OnJoinLines(self, event):
+        print 'join'
     def update_line(self, old_page_nbr):
         self.errorsCtrl.SetValue(u', '.join(self.errors))
         if self.line:
@@ -96,42 +98,55 @@ class BaseFrame(wx.Frame):
             self.linesCtrl.SetValue(text)
             self.linesCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
             self.editCtrl.SetValue(self.line.text)
+            self.linesCtrl.SetFocus()
+            self.editCtrl.SetFocus()
         else:
             self.repeating = True
             self.linesCtrl.SetValue('')
             self.editCtrl.SetValue('')
 
-    def set_line_manager(self, line_manager_):
+    def set_line_manager(self, line_manager_, strict):
+        self.strict = strict
         if line_manager_:
             self.lm = line_manager_
             if CAN_ASPELL:
                 self.spell_checker = line_manager_.spell_checker
                 self.speller = aspell.Speller('lang', line_manager_.spell_checker.lang)
-
+            button_row = 2
             next_error_button = wx.Button(self.panel, wx.ID_ANY, label='Next Error', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnNextBadLine, next_error_button)
             next_error_button.SetDefault()
             next_error_button.SetSize(next_error_button.GetBestSize())
-            self.current_text.Add(next_error_button, row=2, col=1)
+            self.current_text.Add(next_error_button, row=button_row, col=1)
 
+            button_row += 1
             next_line_button = wx.Button(self.panel, wx.ID_ANY, label='Next Line', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnNextLine, next_line_button)
             next_line_button.SetDefault()
             next_line_button.SetSize(next_line_button.GetBestSize())
-            self.current_text.Add(next_line_button, row=3, col=1)
+            self.current_text.Add(next_line_button, row=button_row, col=1)
 
+            button_row += 1
             previous_line_button = wx.Button(self.panel, wx.ID_ANY, label='Prev Line', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnPreviousLine, previous_line_button)
             previous_line_button.SetDefault()
             previous_line_button.SetSize(previous_line_button.GetBestSize())
-            self.current_text.Add(previous_line_button, row=4, col=1)
+            self.current_text.Add(previous_line_button, row=button_row, col=1)
+            if self.strict:
+                button_row += 1
+                join_line_button = wx.Button(self.panel, wx.ID_ANY, label='Join Lines', size=(90, 30))
+                self.Bind(wx.EVT_BUTTON, self.OnJoinLines, join_line_button)
+                join_line_button.SetDefault()
+                join_line_button.SetSize(join_line_button.GetBestSize())
+                self.current_text.Add(join_line_button, row=button_row, col=1)
 
             if self.speller:
+                button_row += 1
                 add_to_dictionary_button = wx.Button(self.panel, wx.ID_ANY, label='+ to Dict', size=(90, 30))
                 self.Bind(wx.EVT_BUTTON, self.OnAddToDict, add_to_dictionary_button)
                 add_to_dictionary_button.SetDefault()
                 add_to_dictionary_button.SetSize(add_to_dictionary_button.GetBestSize())
-                self.current_text.Add(add_to_dictionary_button, row=5, col=1)
+                self.current_text.Add(add_to_dictionary_button, row=button_row, col=1)
             # Sizers for layout
             self.panel.SetSizerAndFit(self.current_text)
     def OnAddToDict(self, event):
@@ -155,9 +170,9 @@ def pil_image_to_scaled_image(pil_image, desired_width):
     scaled_image = full_image.Scale(desired_width, int(desired_width * aspect_ratio), wx.IMAGE_QUALITY_NORMAL)
     return wx.BitmapFromImage(scaled_image)
 
-def main(line_manager_):
+def main(line_manager_, strict):
     app = App()
-    app.set_line_manager(line_manager_)
+    app.set_line_manager(line_manager_, strict)
     app.MainLoop()
 if __name__ == '__main__':
     main()

@@ -16,6 +16,7 @@ import document_builder
 import line_manager
 import spell_checker
 import gui
+import gui2
 
 def test():
     """ Whatever is being worked on."""
@@ -50,7 +51,7 @@ def examine_slices():
 def check_if_ok():
     lang = get_lang()
     lm = line_manager.LineManager(
-        spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang))
+        spell_checker.AspellSpellChecker(lang)
         )
     lm.load('text/clean')
     good = []
@@ -90,14 +91,13 @@ def check_if_ok():
 
 def page_info():
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    checker = spell_checker.AspellSpellChecker(lang)
     db = document_builder.SpellcheckDocMaker(checker)
     db.page_image_info('text/raw', 'images/pages')
+
 def possible_headers():
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    checker = spell_checker.AspellSpellChecker(lang)
     db = document_builder.SpellcheckDocMaker(checker)
     db.possible_headers('text/raw')
 
@@ -110,8 +110,7 @@ def proper_names():
     
 def cross_line_fixes():
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    checker = spell_checker.AspellSpellChecker(lang)
     db = document_builder.SpellcheckDocMaker(checker)
     db.make_line_join_doc('text/clean')
 
@@ -120,13 +119,36 @@ def fix_spells():
     tries to find fixed versions of them.
     """
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    checker = spell_checker.AspellSpellChecker(lang)
 
     db = document_builder.SpellcheckDocMaker(checker)
     db.make_word_fix_doc('text/clean')
 
-def run_gui(start_page, end_page):
+def run_gui2():
+    """ Batch cleans the pages in text/clean."""
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang)
+        )
+    lm.load('text/clean')
+    gui2.main(lm)
+def run_gui3():
+    """ Batch cleans the pages in text/clean."""
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang)
+        )
+    config = ConfigParser()
+    config.read('book.cnf')
+    lm.load('text/clean')
+    last_page, last_line = (15, 6,)
+    lm.write_html(config, last_page, last_line)
+    config.set('process', 'last_html_page', last_page)
+    config.set('process', 'last_html_line', last_line)
+    with open('book.cnf', 'wb') as f:
+        config.write(f)
+
+def run_gui(start_page, end_page, strict):
     """ Batch cleans the pages in text/clean."""
     lang = get_lang()
     lm = line_manager.LineManager(
@@ -135,7 +157,7 @@ def run_gui(start_page, end_page):
         end_page
         )
     lm.load('text/clean')
-    gui.main(lm)
+    gui.main(lm, strict)
     lm.write_pages('text/clean', False)
 def new():
     """ Create/update config, dictionary, and file structure."""
@@ -160,10 +182,6 @@ def new():
 
     # Make sure dictionary exists
     lang = get_lang()
-    dict_file_name = './dict.{}.pws'.format(lang)
-    if not os.path.exists(dict_file_name):
-        with open(dict_file_name, 'a') as f:
-           f.write('personal_ws-1.1 {} 0'.format(lang)) 
     print 'Initialization Complete'
 
 def set_up_sections(config):
@@ -275,7 +293,27 @@ def remove_headers():
     checker = spell_checker.AspellSpellChecker(lang, dict_)
     db = document_builder.SpellcheckDocMaker(checker)
     db.remove_possible_headers('text/clean')
-    
+
+def _loaded_file_line_manager(start_page, end_page):
+    """ Returns loaded line manager with aspell spell checker."""
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.FileConfiguredSpellChecker(lang),
+        start_page,
+        end_page
+        )
+    lm.load('text/clean')
+    return lm
+def _loaded_aspell_line_manager(start_page, end_page):
+    """ Returns loaded line manager with aspell spell checker."""
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang),
+        start_page,
+        end_page
+        )
+    lm.load('text/clean')
+    return lm
 def clean(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
 
@@ -283,8 +321,13 @@ def clean(start_page, end_page):
     config.read('book.cnf')
     try:
         clean_headers = config.getboolean('process', 'clean_headers')
-    except:
+    except NoOptionError:
         clean_headers = True
+    try:
+        join_lines = config.getboolean('process', 'join_lines')
+    except NoOptionError:
+        join_lines = True
+
     if clean_headers:
 	print 'cleaning headers'
         remove_headers()
@@ -293,14 +336,17 @@ def clean(start_page, end_page):
         config.set('process', 'clean_headers', 'false')
         with open('book.cnf', 'wb') as f:
             config.write(f)
-        lang = get_lang()
-        lm = line_manager.LineManager(
-            spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
-            start_page,
-            end_page
-            )
-        lm.load('text/clean')
+        lm =_loaded_aspell_line_manager(start_page, end_page)
         lm.quick_fix()
+    elif join_lines:
+	print 'joining lines'
+        if not config.has_section('process'):
+            config.add_section('process')
+        config.set('process', 'join_lines', 'false')
+        with open('book.cnf', 'wb') as f:
+            config.write(f)
+        lm =_loaded_file_line_manager(start_page, end_page)
+        lm.join_lines()
     else:
         # if interrupted by keyboard, go ahead and write changes
         lang = get_lang()
@@ -308,7 +354,7 @@ def clean(start_page, end_page):
 #           spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
         lm = line_manager.LineManager(
 #           spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
-            spell_checker.FileConfiguredSpellChecker(lang, './dict.{}.pws'.format(lang)),
+            spell_checker.FileConfiguredSpellChecker(lang),
             start_page,
             end_page
             )
@@ -330,6 +376,10 @@ def extract_text(verbose):
     pdf_processor = process_pdf.PdfProcessor(verbose)
     pdf_processor.extract_text_from_pages(tesseract_lang)
 
+def symlink_images(verbose):
+    pdf_processor = process_pdf.PdfProcessor(verbose)
+    pdf_processor.symlink_images()
+
 def aspell_lang_to_tesseract_lang(aspell_lang):
     if aspell_lang.startswith('fr'):
         return 'fra'
@@ -341,8 +391,7 @@ def aspell_clean():
 
     starts_with_cap = re.compile('^[A-Z]')
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, dict_)
+    checker = spell_checker.AspellSpellChecker(lang)
     bad_word_ctr = Counter()
     for fn in os.listdir('text/clean'):
         if fn.endswith('.txt'):
@@ -358,8 +407,7 @@ def aspell_clean():
         
 def aspell_run(start, end):
     lang = get_lang()
-    dict_ = './dict.{}.pws'.format(lang)
-    checker = spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang))
+    checker = spell_checker.AspellSpellChecker(lang)
     for fn in sorted(os.listdir('text/clean'), key=lambda x: int(os.path.splitext(x)[0])):
         
         basename, ext = os.path.splitext(fn)
@@ -409,11 +457,15 @@ def run():
         'fix': 'f',
         'html': 'h',
         'headers': 'hf',
+        'page_info': 'pi',
         'gui': 'g',
+        'gui2': 'g2',
+        'gui3': 'g3',
         'fix_spells': 'fs',
         'fix_all': 'fa',
         'fix_lines': 'fl',
         'page_grid': 'pg',
+        'symlink_images': 'si',
         'test': 't',
     }
     parser = ArgumentParser(
@@ -432,7 +484,7 @@ def run():
         dest='end',
         help='What page to end on (defaults to last page)')
     parser.add_argument('-interval', type=int,
-        default=10,
+        default=30,
         dest='interval',
         help='How many pages to process in interactive mode (defaults to 10)')
     parser.add_argument('-language', type=str,
@@ -447,6 +499,10 @@ def run():
         default='-1',
         dest='page_nbr',
         help='Page number for page grid')
+    parser.add_argument('-strict', type=bool,
+        default=False,
+        dest='strict',
+        help='In gui, whether to use strict checking')
     args = parser.parse_args()
     acceptable_actions = [item for pair in actions.items() for item in pair]
     if args.action not in acceptable_actions:
@@ -464,10 +520,14 @@ def run():
         extract_text(args.verbose)
     elif args.action in ('extract_images', 'i',):
         extract_images(args.verbose)
+    elif args.action in ('symlink_images', 'si',):
+        symlink_images(args.verbose)
     elif args.action in ('extract_text', 't',):
         extract_text(args.verbose)
     elif args.action in ('spell_check', 'a',):
         aspell_clean()
+    elif args.action in ('page_info', 'pi',):
+        page_info()
     elif args.action in ('clean', 'c',):
         clean(args.start, args.end) 
     elif args.action in ('fix', 'f',):
@@ -494,11 +554,15 @@ def run():
     elif args.action in ('html', 'h',):
         print '"HTML" is not ready yet'
     elif args.action in ('gui', 'g'):
-        if args.end == 0:
+        if args.end == 1:
             end_page = args.start + args.interval - 1
         else:
             end_page = args.end
-        run_gui(args.start, end_page)
+        run_gui(args.start, end_page, args.strict)
+    elif args.action == 'gui2':
+        run_gui2()
+    elif args.action == 'gui3':
+        run_gui3()
     else:
         test()
 #   process_pdfs()
