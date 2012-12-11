@@ -17,6 +17,7 @@ import line_manager
 import spell_checker
 import gui
 import gui2
+import gui3
 
 def test():
     """ Whatever is being worked on."""
@@ -132,24 +133,48 @@ def run_gui2():
         )
     lm.load('text/clean')
     gui2.main(lm)
+
 def run_gui3():
     """ Batch cleans the pages in text/clean."""
-    lang = get_lang()
-    lm = line_manager.LineManager(
-        spell_checker.AspellSpellChecker(lang)
-        )
     config = ConfigParser()
     config.read('book.cnf')
+    if config.has_option('process', 'last_html_page'):
+        start_page = config.getint('process', 'last_html_page')
+    else:
+        start_page = 0
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang),
+        start_page
+        )
     lm.load('text/clean')
-    last_page, last_line = (15, 6,)
-    lm.write_html(config, last_page, last_line)
-    config.set('process', 'last_html_page', last_page)
-    config.set('process', 'last_html_line', last_line)
+    app = gui3.main(lm)
+    last_page = int(app.last_html_page)
+    last_line = app.last_html_line
+    lm.write_html(config, int(last_page), int(last_line))
+    if last_page >= start_page:
+        config.set('process', 'last_html_page', last_page)
+        config.set('process', 'last_html_line', last_line)
     with open('book.cnf', 'wb') as f:
         config.write(f)
 
-def run_gui(start_page, end_page, strict):
+def run_gui(input_start_page, end_page, strict):
     """ Batch cleans the pages in text/clean."""
+    config = ConfigParser()
+    config.read('book.cnf')
+    if strict and \
+        config.has_option('process', 'last_strict_page'):
+        hold_page = config.getint('process', 'last_strict_page')
+    elif not strict and \
+        config.has_option('process', 'last_checked_page'):
+        hold_page = config.getint('process', 'last_checked_page')
+    else:
+        hold_page = input_start_page
+    print hold_page
+    if input_start_page == 0:
+        start_page = hold_page
+    else:
+        start_page = input_start_page
     lang = get_lang()
     lm = line_manager.LineManager(
         spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang)),
@@ -157,8 +182,16 @@ def run_gui(start_page, end_page, strict):
         end_page
         )
     lm.load('text/clean')
-    gui.main(lm, strict)
+    app = gui.main(lm, strict)
     lm.write_pages('text/clean', False)
+
+    if strict and int(app.last_page) >= hold_page:
+        config.set('process', 'last_strict_page', app.last_page)
+    elif not strict and int(app.last_page) >= hold_page:
+        config.set('process', 'last_checked_page', app.last_page)
+    with open('book.cnf', 'wb') as f:
+        config.write(f)
+    
 def new():
     """ Create/update config, dictionary, and file structure."""
     # Set up pdfs

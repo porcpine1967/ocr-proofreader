@@ -21,13 +21,20 @@ WIDTH = 800
 class App(wx.App):
     def OnInit(self):
         self.line_manager = None
-        self.frame = BaseFrame(parent=None, title="Test App", size=(WIDTH, 600))
+        self.frame = BaseFrame(parent=None, title="Spell Fix", size=(WIDTH, 600))
         self.frame.Show(True)
         self.SetTopWindow(self.frame)
         return True
 
+
     def set_line_manager(self, line_manager, strict):
+        self.strict = strict
+        self.last_page = 0
         self.frame.set_line_manager(line_manager, strict)
+        self.frame.last_page_callback = self.set_last_page
+
+    def set_last_page(self, last_page):
+        self.last_page = last_page
 
 class BaseFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
@@ -62,6 +69,14 @@ class BaseFrame(wx.Frame):
         self.current_text.Add(self.editCtrl, row=7, col=2)
         self.current_text.Add(self.imageCtrl, row=8, col=2)
 
+        self.last_page_callback = None
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+
+    def OnClose(self, event):
+        if self.last_page_callback:
+            self.last_page_callback(self.page_nbr)
+        self.Destroy()
+
     def OnEdit(self, event):
         self.line.set_text(event.GetString())
         self.OnPreviousLine(None)
@@ -86,7 +101,13 @@ class BaseFrame(wx.Frame):
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
     def OnJoinLines(self, event):
-        print 'join'
+        if self.line:
+            wtvr, next_line = self.lm.next_line(self.page_nbr, self.line)
+            if next_line:
+                last_word = self.line.pop_last_word()
+                next_line.set_text(last_word + next_line.text)
+        self.update_line(self.page_nbr)
+
     def update_line(self, old_page_nbr):
         self.errorsCtrl.SetValue(u', '.join(self.errors))
         if self.line:
@@ -100,6 +121,14 @@ class BaseFrame(wx.Frame):
             self.editCtrl.SetValue(self.line.text)
             self.linesCtrl.SetFocus()
             self.editCtrl.SetFocus()
+            if self.errors:
+                try:
+                    point = self.line.text.index(self.errors[0]) + len(self.errors[0])
+                except ValueError:
+                    point = len(self.line.text)
+            else:
+                point = len(self.line.text)
+            self.editCtrl.SetInsertionPoint(point)
         else:
             self.repeating = True
             self.linesCtrl.SetValue('')
@@ -174,6 +203,7 @@ def main(line_manager_, strict):
     app = App()
     app.set_line_manager(line_manager_, strict)
     app.MainLoop()
+    return app
 if __name__ == '__main__':
     main()
 

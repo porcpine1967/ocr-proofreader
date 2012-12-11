@@ -305,7 +305,7 @@ class LineManager(object):
                     f.write('<!-- Page {} -->\n'.format(page_nbr))
                     if self.verbose:
                         print 'Writing page {:3}'.format(page_nbr)
-                if int(page_nbr) > last_written_page:
+                if int(page_nbr) >= last_written_page:
                     hit_start_page = True
                 if hit_start_page:
                     for line in self.pages[page_nbr]:
@@ -469,7 +469,9 @@ class Line(object):
 
     def pop_last_word(self):
         """ For joining hyphens, removes last word of line."""
-        self.text = u' '.join(self.text.split()[:-1])
+        words = self.text.split()
+        self.text = u' '.join(words[:-1])
+        return words[-1]
 
     def replace_first_word(self, word):
         """ For joining hyphens, puts the prefix of the word in front."""

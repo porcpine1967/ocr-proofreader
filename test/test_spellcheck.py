@@ -45,6 +45,7 @@ class SpellCheckTester(unittest.TestCase):
             "he'll",
             'What',
             'hiss',
+            'different',
         ])
         for test, expected in test_expected('{}/test_spellcheck/fix_spelling'.format(PATH)):
             self.assertEqual(sc.fix_spelling(test), expected)

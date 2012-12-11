@@ -21,6 +21,7 @@ class DocumentBuilderTester(unittest.TestCase):
             "he'll",
             'What',
             'hiss',
+            'different',
         ])
         db = document_builder.SpellcheckDocMaker(sc)
         for test, expected in test_expected('{}/test_spellcheck/fix_spelling'.format(PATH)):
