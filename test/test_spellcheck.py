@@ -88,7 +88,6 @@ class SpellCheckTester(unittest.TestCase):
         # check double
         expected = set([('bum5', 'burn5', u'rn-to-m'), (u'burns', 'burn5', u'5-to-s'), (u'bums', 'bum5', u'5-to-s')])
         self.assertEqual(expected, sc.transformed_variations('burn5'))
-        print sc.transformed_variations('dilferent')
 
     def test_proper_noun(self):
         sc = spell_checker.StubSpellChecker([])
