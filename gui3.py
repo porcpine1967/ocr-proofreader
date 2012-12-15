@@ -91,18 +91,21 @@ class BaseFrame(wx.Frame):
     def OnAddParagraph(self, event):
         if self.line:
 #           self.line.set_text(u'<p style="font-family:monospace">{}'.format(self.line.text))
-            self.line.set_text(u'<p>{}'.format(self.line.text))
-            self.update_line(self.page_nbr)
+            self.line.set_text(u'<p>{}'.format(self.editCtrl.GetValue()))
+            self.OnNextLine(None)
  
     def update_line(self, old_page_nbr):
         if self.line:
             if old_page_nbr != self.page_nbr:
                 self.page_image = Image.open('images/pages/{}.pbm'.format(self.page_nbr))
-            self.imageCtrl.SetBitmap(pil_image_to_scaled_image(self.line.line_info.image(self.page_image, 1), WIDTH - 100))
             before_line, after_line, idx = self.lm.line_context(self.page_nbr, self.line)
-            text = '\n'.join((before_line, self.line.text, after_line,))
+            self.imageCtrl.SetBitmap(pil_image_to_scaled_image(self.line.line_info.image(self.page_image, 
+                                                                top=before_line.line_info.y,
+                                                                bottom=after_line.line_info.y + after_line.line_info.height), 
+                                    WIDTH - 100))
+            text = '\n'.join((before_line.text, self.line.text, after_line.text,))
             self.linesCtrl.SetValue(text)
-            self.linesCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
+            self.linesCtrl.SetStyle(len(before_line.text), len(before_line.text) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
             self.editCtrl.SetValue(self.line.text)
             self.linesCtrl.SetFocus()
             self.editCtrl.SetFocus()

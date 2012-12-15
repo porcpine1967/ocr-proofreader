@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 import re
+ENGLISH_ACCEPTABLE_SINGLE_LETTERS = (
+u'a',
+u'A',
+u'I',
+)
 FRENCH_ACCEPTABLE_SINGLE_LETTERS = (
 u'a',
 u'\xe0',
@@ -1360,10 +1365,13 @@ u'\u1F18A': 'CROSSED NEGATIVE SQUARED LATIN CAPITAL LETTER P',
 
 LATIN_CAPITALS = [letter for letter, description in UNICODE_LATIN.items() if description.startswith('LATIN CAPITAL')]
 LATIN_SMALLS = [letter for letter, description in UNICODE_LATIN.items() if description.startswith('LATIN SMALL')]
+SINGLE_ENGLISH_SMALLS = [letter for letter in LATIN_SMALLS if letter not in ENGLISH_ACCEPTABLE_SINGLE_LETTERS]
+SINGLE_ENGLISH_CAPITALS = [letter for letter in LATIN_CAPITALS if letter not in ENGLISH_ACCEPTABLE_SINGLE_LETTERS]
 SINGLE_FRENCH_SMALLS = [letter for letter in LATIN_SMALLS if letter not in FRENCH_ACCEPTABLE_SINGLE_LETTERS]
 SINGLE_FRENCH_CAPITALS = [letter for letter in LATIN_CAPITALS if letter not in FRENCH_ACCEPTABLE_SINGLE_LETTERS]
 REGEX_LETTER = u'[{}{}]'.format(''.join(LATIN_CAPITALS), ''.join(LATIN_SMALLS))
 REGEX_CAPITAL = u'[{}]'.format(''.join(LATIN_CAPITALS))
+ENGLISH_BAD_SINGLES = u'[{}{}]'.format(''.join(SINGLE_ENGLISH_CAPITALS), ''.join(SINGLE_ENGLISH_SMALLS))
 FRENCH_BAD_SINGLES = u'[{}{}]'.format(''.join(SINGLE_FRENCH_CAPITALS), ''.join(SINGLE_FRENCH_SMALLS))
 REGEX_SMALL = u'[{}]'.format(''.join(LATIN_SMALLS))
 if __name__ == '__main__':

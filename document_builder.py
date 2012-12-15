@@ -393,16 +393,19 @@ class LineInfo(object):
     def density(self):
         return sum([pl.density for pl in self.pixel_lines])/(len(self.pixel_lines or 1))
 
-    def image(self, image, buffer_=0):
+    def image(self, image, buffer_=0, top=-1, bottom=None):
         """ Returns slice of image associated with this line.
 
         parameters:
         image - Image object of the page
         buffer = multiple of line height to include
         """
+            
         width, height = image.size
-        top = max(0, self.y - (buffer_*self.height))
-        bottom = min(height, self.y + self.height + (buffer_*self.height))
+        if top < 0 or not bottom:
+            top = max(0, self.y - (buffer_*self.height))
+            bottom = min(height, self.y + self.height + (buffer_*self.height))
+        
         return image.crop((0, top, width, bottom))
         
     def __str__(self):

@@ -196,18 +196,20 @@ class LineManager(object):
                 
     def line_context(self, page_nbr, check_line):
         """ Returns text of lines above and below."""
-        before_line = '[PAGE BEGIN]'
-        after_line = '[PAGE END]'
+        before_line = Line('[PAGE BEGIN]', 0, self.spell_checker)
+        after_line = Line('[PAGE END]', len(self.pages[page_nbr].lines), self.spell_checker)
         idx = 0
         lines = self.pages[page_nbr].lines
         try:
             idx = lines.index(check_line)
             if idx > 0:
-                before_line = lines[idx-1].text
+                before_line = lines[idx-1]
+            else:
+                before_line.line_info = check_line.line_info
             try:
-                after_line = lines[idx+1].text
+                after_line = lines[idx+1]
             except IndexError:
-                pass
+                after_line.line_info = check_line.line_info
         except ValueError:
             pass
         return before_line, after_line, idx

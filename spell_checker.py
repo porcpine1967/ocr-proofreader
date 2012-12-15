@@ -9,7 +9,7 @@ import os
 import re
 from subprocess import Popen, PIPE
 
-from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL, FRENCH_BAD_SINGLES
+from regex_helper import REGEX_LETTER, REGEX_CAPITAL, REGEX_SMALL, FRENCH_BAD_SINGLES, ENGLISH_BAD_SINGLES
 
 begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
 ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
@@ -94,7 +94,7 @@ class BaseSpellFixer(object):
             re.compile(r"\b1'", flags=re.UNICODE),
         ]
 	self.strict_checks = [
-#           re.compile(r'[0-9]', flags=re.UNICODE),
+            re.compile(r'[0-9]', flags=re.UNICODE),
             re.compile(r'-$', flags=re.UNICODE),
             re.compile(r'<', flags=re.UNICODE),
             re.compile(r'>', flags=re.UNICODE),
@@ -121,6 +121,12 @@ class EnglishSpellFixer(BaseSpellFixer):
             (re.compile(u'({})[il]([st])\\b'.format(REGEX_SMALL), flags=re.UNICODE), r"\1'\2", u'add-apostrophe',),
             (re.compile(u'\\bof({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r'of \1', u'ofxxx-to-of[space]xxx',),
         ])
+
+        self.strict_checks.extend([
+            re.compile(u"(^|[^'])\\b{}\\b".format(ENGLISH_BAD_SINGLES), flags=re.UNICODE),
+            re.compile(r"[^s.]'($|\s)", flags=re.UNICODE),
+            re.compile(r"\s'", flags=re.UNICODE),
+	])
 
 class FrenchSpellFixer(BaseSpellFixer):
     def __init__(self):
@@ -206,7 +212,7 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(u'({}{{3,}})[li]\\.\\.'.format(REGEX_LETTER), flags=re.UNICODE), r'\1!..', u'l-or-i-to-!',),
 	])
 	self.strict_checks.extend( [
-#           re.compile(r'"', flags=re.UNICODE),
+            re.compile(r'"', flags=re.UNICODE),
 #           re.compile(u"\\b[bcdefghijklmnopqrstuvwxzBCDEFGHIJKLMNOPQRSTUVWXYZ]\\b[^'-]", flags=re.UNICODE),
             re.compile(u"\\b{}\\b($|[^'-])".format(FRENCH_BAD_SINGLES), flags=re.UNICODE),
         ])
