@@ -180,6 +180,25 @@ class LineManager(object):
                     found = True
         return '0', None, []
 
+    def next_value(self, pattern_string, start_page_nbr, start_line):
+        """ Searches for a pattern in the lines afte page nbr/line.
+
+        returns page_nbr and line or 0,None."""
+        pattern = re.compile(pattern_string, flags=re.UNICODE)
+        found = not bool(start_page_nbr and start_line)
+        for page_nbr in self.page_numbers:
+            if int(page_nbr) < int(start_page_nbr):
+                continue
+            lines = self.pages[page_nbr]
+            for line in lines:
+                if found:
+                    m = pattern.search(line.text)
+                    if m:
+                        return page_nbr, line, (m.group(),)
+                elif line == start_line:
+                    found = True
+        return '0', None, []
+        
     def find_word(self, word):
         """ Finds the first use of a word in the document.
 
@@ -414,6 +433,7 @@ class Line(object):
 
         if strict:
             to_check = list(self.spell_checker.strict_check(self.text))
+            return to_check
         else:
             to_check = []
             

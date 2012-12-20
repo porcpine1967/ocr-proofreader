@@ -59,15 +59,25 @@ class BaseFrame(wx.Frame):
             size=(WIDTH - 100, 40,), style=wx.TE_PROCESS_ENTER)
         self.imageCtrl = wx.StaticBitmap(self.panel, wx.ID_ANY, 
             wx.BitmapFromBuffer(1,1,array.array('B', (0,0,0,))), size=(WIDTH - 100, 180,)) 
-
+	self.searchCtrl = wx.TextCtrl(self.panel, wx.ID_ANY, '', 
+            size=(WIDTH - 100, 40,), style=wx.TE_PROCESS_ENTER)
 
         self.Bind(wx.EVT_TEXT_ENTER, self.OnEdit, self.editCtrl)
+        self.Bind(wx.EVT_TEXT_ENTER, self.OnSearch, self.searchCtrl)
+
         self.current_text.Add(wx.StaticText(self.panel, wx.ID_ANY, 'Page'), row=1, col=1)
         self.current_text.Add(self.pageCtrl, row=1, col=2)
         self.current_text.Add(self.linesCtrl, row=2, col=2, rowspan=4)
         self.current_text.Add(self.errorsCtrl, row=6, col=2)
         self.current_text.Add(self.editCtrl, row=7, col=2)
         self.current_text.Add(self.imageCtrl, row=8, col=2)
+        self.current_text.Add(self.searchCtrl, row=9, col=2)
+
+        search_button = wx.Button(self.panel, wx.ID_ANY, label='Search', size=(90, 30))
+        self.Bind(wx.EVT_BUTTON, self.OnSearch, search_button)
+        search_button.SetDefault()
+        search_button.SetSize(search_button.GetBestSize())
+        self.current_text.Add(search_button, row=9, col=1)
 
         self.last_page_callback = None
         self.Bind(wx.EVT_CLOSE, self.OnClose)
@@ -80,6 +90,14 @@ class BaseFrame(wx.Frame):
     def OnEdit(self, event):
         self.line.set_text(event.GetString())
         self.OnPreviousLine(None)
+
+    def OnSearch(self, event):
+        term = self.searchCtrl.GetValue()
+        if term:
+            old_page_nbr = self.page_nbr
+            self.page_nbr, self.line, self.errors = self.lm.next_value(term, self.page_nbr, self.line)
+            self.pageCtrl.SetValue(str(self.page_nbr))
+            self.update_line(old_page_nbr)
 
     def OnPreviousLine(self, event):
         self.errors = []
@@ -100,6 +118,7 @@ class BaseFrame(wx.Frame):
         self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating, strict=self.strict)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
+
     def OnJoinLines(self, event):
         if self.line:
             wtvr, next_line = self.lm.next_line(self.page_nbr, self.line)

@@ -104,6 +104,10 @@ class BaseSpellFixer(object):
             re.compile(r'\[', flags=re.UNICODE),
             re.compile(u'\xab\\S', flags=re.UNICODE),
             re.compile(r'\. \.', flags=re.UNICODE),
+            re.compile(r"\s'", flags=re.UNICODE),
+            re.compile(r"'\s", flags=re.UNICODE),
+            re.compile(r"\s-[^\s]", flags=re.UNICODE),
+            re.compile(r"[^\s]-\s", flags=re.UNICODE),
 	]	
 
 class EnglishSpellFixer(BaseSpellFixer):
@@ -232,6 +236,7 @@ class BaseSpellChecker(object):
 
 #               print regex.pattern
                 strict_matches.add(m.group(0))
+
         return strict_matches
 
     def quick_fix(self, word):
