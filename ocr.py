@@ -585,7 +585,7 @@ def run():
     elif args.action in ('fix_lines', 'ft',):
         cross_line_fixes()
     elif args.action in ('html', 'h',):
-        print '"HTML" is not ready yet'
+        run_gui3()
     elif args.action in ('gui', 'g'):
         if args.end == 1:
             end_page = args.start + args.interval - 1
