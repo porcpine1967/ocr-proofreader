@@ -15,7 +15,6 @@ begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
 ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
 ends_with_hyphen = re.compile(r'.*-$', re.UNICODE).match
 starts_with_capital = re.compile(u'["\']?{}'.format(REGEX_CAPITAL), re.UNICODE).match
-ends_sentence = re.compile(r'.*[.?!]["\']?$', re.UNICODE).match
 
 class BaseSpellFixer(object):
     """
@@ -78,9 +77,12 @@ class BaseSpellFixer(object):
 
 	]
         self.odd_punctuation = [
+            # Single right-pointed angle quotation mark inside a word
             re.compile(u'{}\u203a{}'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE),
-            # begin paragraph directly after a letter
+            # begin parenthesis directly after a letter
             re.compile(u'{}+\\('.format(REGEX_LETTER), flags=re.UNICODE),
+            # end parenthesis followed directly by a letter
+            re.compile(u'\\){}'.format(REGEX_LETTER), flags=re.UNICODE),
             # ending punctuation inside a word
             re.compile(u'[{}]+{}+'.format(re.escape('?)!,.:;'), REGEX_LETTER), flags=re.UNICODE),
             # quotation mark or degree sign inside a word
@@ -91,6 +93,7 @@ class BaseSpellFixer(object):
             # number-letter combinations
             re.compile(u'\\d{}'.format(REGEX_LETTER), flags=re.UNICODE),
             re.compile(u'{}\\d'.format(REGEX_LETTER), flags=re.UNICODE),
+            # word beginning 1'
             re.compile(r"\b1'", flags=re.UNICODE),
         ]
 	self.strict_checks = [
@@ -109,6 +112,14 @@ class BaseSpellFixer(object):
             re.compile(r"\s-[^\s]", flags=re.UNICODE),
             re.compile(r"[^\s]-\s", flags=re.UNICODE),
 	]	
+
+	self.ends_sentence = re.compile(r'.*[.?!]["\')]?$', re.UNICODE).match
+        self.garbage_strippers = [
+            (re.compile(r'"', flags=re.UNICODE), ''),
+            (re.compile(r'[;:,.?]$', flags=re.UNICODE), ''),
+            (re.compile(r"'[ds]$", flags=re.UNICODE), ''), 
+            (re.compile(r'(...)-.*', flags=re.UNICODE), r'\1'),
+        ]   
 
 class EnglishSpellFixer(BaseSpellFixer):
     def __init__(self):
@@ -227,6 +238,15 @@ class BaseSpellChecker(object):
         self.format_string = u'{:30} {:30} {:30} {:30}\n'
         self.line_join_fixes = {}
 
+    def strip_garbage(self, word):
+        """ Removes words useless for proper name comparison."""
+        hold_word = word
+        for regex, repl in self.fixer.garbage_strippers:
+            word = regex.sub(repl, word)
+        if word != hold_word:
+            print word
+        return word
+
     def strict_check(self, line):
         """ Takes a string and returns an array of strict matches."""
         strict_matches = set()
@@ -249,12 +269,14 @@ class BaseSpellChecker(object):
                 word = new_word
         return new_word
 
-    def odd_punctuation(self, word):
+    def odd_punctuation(self, line):
         # Note: can return True even if would be fixed by fix spelling
+        odd = set()
         for regex in self.fixer.odd_punctuation:
-            if regex.search(word):
-                return True
-        return False
+            m = regex.search(line)
+            if m:
+                odd.add(m.group(0))
+        return odd
 
 
     def hyphenated_versions(self, word, min_chars=3):
@@ -444,7 +466,7 @@ class BaseSpellChecker(object):
         if not starts_with_capital(word_to_check):
             return False
         
-        return not ends_sentence(preceding_word)
+        return not self.fixer.ends_sentence(preceding_word)
 
     def odd_orthography(self, word_1, word_2):
         """ Returns True if the orthography is a little weird

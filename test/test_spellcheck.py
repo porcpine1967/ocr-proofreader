@@ -52,7 +52,7 @@ class SpellCheckTester(unittest.TestCase):
     def test_odd_punctuation(self):
         sc = spell_checker.StubSpellChecker(['a','b','c','d',])
         for test, expected in test_expected('{}/test_spellcheck/odd_punctuation'.format(PATH)):
-            self.assertEqual(sc.odd_punctuation(test), bool(int(expected)), test)
+            self.assertEqual(bool(sc.odd_punctuation(test)), bool(int(expected)), test)
     def test_hyphenate(self):
         sc = spell_checker.StubSpellChecker([
                 'pearl-jam',
@@ -131,5 +131,13 @@ class SpellCheckTester(unittest.TestCase):
         sc = spell_checker.StubSpellChecker([])
         sc.fixer = spell_checker.FrenchSpellFixer()
         self.assertEquals(set('f'), sc.strict_check('f'))
+    def test_garbage_stripper(self):
+        words = (
+            ("Julia-she", "Julia"),
+            ("Bob's", 'Bob'),
+        )
+        sc = spell_checker.StubSpellChecker([])
+        for word, expected in words:
+            self.assertEquals(expected, sc.strip_garbage(word))
 if __name__ == '__main__':
     unittest.main()

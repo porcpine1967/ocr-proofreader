@@ -180,8 +180,39 @@ class LineManager(object):
                     found = True
         return '0', None, []
 
+    def next_proper_noun(self, start_page_nbr, start_line, skip_list):
+        """ Starting at start line, sees if word pairs
+        imply that one or more of them is a proper noun.
+        returns page nbr, line with proper nouns, and list of
+        proper nouns.
+        """
+        found = not bool(start_page_nbr and start_line)
+        proper_nouns = []	
+        try:
+            hold_word = start_line.text.split()[-1]
+        except AttributeError:
+            hold_word = ''
+        for page_nbr in self.page_numbers:
+            if int(page_nbr) < int(start_page_nbr):
+                continue
+            lines = self.pages[page_nbr]
+            for line in lines:
+                if found:
+                    proper_nouns.extend([w for w in self.spell_checker.odd_punctuation(line.text)])
+                    for word in line.text.split(): 
+                        
+                        if self.spell_checker.strip_garbage(word) not in skip_list:
+                            if self.spell_checker.proper_noun(hold_word, word):
+                                proper_nouns.append(word)
+                        if word:
+                            hold_word = word
+                    if proper_nouns:
+                        return page_nbr, line, proper_nouns
+                elif line == start_line:
+                    found = True
+        return '0', None, proper_nouns
     def next_value(self, pattern_string, start_page_nbr, start_line):
-        """ Searches for a pattern in the lines afte page nbr/line.
+        """ Searches for a pattern in the lines after page nbr/line.
 
         returns page_nbr and line or 0,None."""
         pattern = re.compile(pattern_string, flags=re.UNICODE)

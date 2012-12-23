@@ -18,6 +18,7 @@ import spell_checker
 import gui
 import gui2
 import gui3
+import gui4
 
 def test():
     """ Whatever is being worked on."""
@@ -155,6 +156,29 @@ def run_gui3():
     if last_page >= start_page:
         config.set('process', 'last_html_page', last_page)
         config.set('process', 'last_html_line', last_line)
+    with open('book.cnf', 'wb') as f:
+        config.write(f)
+
+def run_gui4():
+    
+    """ Checks for proper noun problems."""
+    config = ConfigParser()
+    config.read('book.cnf')
+    if config.has_option('process', 'last_proper_page'):
+        start_page = config.getint('process', 'last_proper_page')
+    else:
+        start_page = 0
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang),
+        start_page
+        )
+    lm.load('text/clean')
+    app = gui4.main(lm)
+    lm.write_pages('text/clean', False)
+    last_page = int(app.last_page)
+    if last_page >= start_page:
+        config.set('process', 'last_proper_page', last_page)
     with open('book.cnf', 'wb') as f:
         config.write(f)
 
@@ -500,6 +524,7 @@ def run():
         'page_grid': 'pg',
         'symlink_images': 'si',
         'test': 't',
+        'odd_punctuation': 'o',
     }
     parser = ArgumentParser(
         description="Tool for converting images of books into corrected text"
@@ -596,6 +621,8 @@ def run():
         run_gui2()
     elif args.action == 'gui3':
         run_gui3()
+    elif args.action == 'odd_punctuation':
+        run_gui4()
     else:
         test()
 #   process_pdfs()
