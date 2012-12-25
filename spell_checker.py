@@ -15,6 +15,7 @@ begins_with_lowercase = re.compile(REGEX_SMALL, re.UNICODE).match
 ends_with_lowercase = re.compile(u'.*{}$'.format(REGEX_SMALL), re.UNICODE).match
 ends_with_hyphen = re.compile(r'.*-$', re.UNICODE).match
 starts_with_capital = re.compile(u'["\']?{}'.format(REGEX_CAPITAL), re.UNICODE).match
+starts_with_lower_case = re.compile(u'["\']?{}'.format(REGEX_SMALL), re.UNICODE).match
 
 class BaseSpellFixer(object):
     """
@@ -78,7 +79,7 @@ class BaseSpellFixer(object):
 	]
         self.odd_punctuation = [
             # Single right-pointed angle quotation mark inside a word
-            re.compile(u'{}\u203a{}'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE),
+            re.compile(u'{}\u203A{}'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE),
             # begin parenthesis directly after a letter
             re.compile(u'{}+\\('.format(REGEX_LETTER), flags=re.UNICODE),
             # end parenthesis followed directly by a letter
@@ -114,9 +115,11 @@ class BaseSpellFixer(object):
 	]	
 
 	self.ends_sentence = re.compile(r'.*[.?!]["\')]?$', re.UNICODE).match
+        self.propers = re.compile(u'\w[^.!?]*?((?:[ ,-]?{}\w*)+)'.format(REGEX_CAPITAL), flags=re.UNICODE).findall
+        self.bad_lowers =  re.compile(u'[.!?]\W*({}\w*)'.format(REGEX_SMALL), flags=re.UNICODE).findall
         self.garbage_strippers = [
             (re.compile(r'"', flags=re.UNICODE), ''),
-            (re.compile(r'[;:,.?]$', flags=re.UNICODE), ''),
+            (re.compile(r'[;:,.!?]$', flags=re.UNICODE), ''),
             (re.compile(r"'[ds]$", flags=re.UNICODE), ''), 
             (re.compile(r'(...)-.*', flags=re.UNICODE), r'\1'),
         ]   
@@ -231,6 +234,9 @@ class FrenchSpellFixer(BaseSpellFixer):
 #           re.compile(u"\\b[bcdefghijklmnopqrstuvwxzBCDEFGHIJKLMNOPQRSTUVWXYZ]\\b[^'-]", flags=re.UNICODE),
             re.compile(u"\\b{}\\b($|[^'-])".format(FRENCH_BAD_SINGLES), flags=re.UNICODE),
         ])
+	self.ends_sentence = re.compile(u'.*[.:?!](["\')]|[\u203A\xAB-]+)?$', re.UNICODE).match
+        self.propers = re.compile(u'\w[^.:!?]*?((?:[ ,-]?{}(?:\'|\w*))+)'.format(REGEX_CAPITAL), flags=re.UNICODE).findall
+        self.bad_lowers =  re.compile(u'\.\W*({}\w*)'.format(REGEX_SMALL), flags=re.UNICODE).findall
 class BaseSpellChecker(object):
     
     def __init__(self):
@@ -243,8 +249,8 @@ class BaseSpellChecker(object):
         hold_word = word
         for regex, repl in self.fixer.garbage_strippers:
             word = regex.sub(repl, word)
-        if word != hold_word:
-            print word
+#       if word != hold_word:
+#           print word
         return word
 
     def strict_check(self, line):
@@ -442,7 +448,7 @@ class BaseSpellChecker(object):
             changed_words = [t[0] for t in changed_versions]
             # aspell maintains order of bad words, but does not return good words
             # we therefore need some way to indicate that nothing was returned
-            # (that is the word was good) in a given area.  This is notede by
+            # (that is the word was good) in a given area.  This is noted by
             # a repetition of xNoTPassx
             # We then split on that, which leaves empty strings in the space
             # that have good words (which fail a boolean test in python)
@@ -463,11 +469,24 @@ class BaseSpellChecker(object):
     def proper_noun(self, preceding_word, word_to_check):
         """ Returns boolean on whether word_to_check is grammatically correct
         only if it is a proper noun."""
-        if not starts_with_capital(word_to_check):
+        if starts_with_capital(word_to_check):
+            return not self.fixer.ends_sentence(preceding_word)
+        elif starts_with_lower_case(word_to_check):
+            return self.fixer.ends_sentence(preceding_word)
+        else:
             return False
-        
-        return not self.fixer.ends_sentence(preceding_word)
+            
+    def proper_nouns(self, line):
+        """ Takes an array of lines and returns all proper nouns. """
+        propers = []
+        for proper in self.fixer.propers(line):
+            propers.extend(w for w in re.split('[, -]', proper) if w)
+        return propers
 
+    def lower_after_sentence(self, line):
+        """ Takes a string and looks for end punctuation followed by lowercase. """
+        return self.fixer.bad_lowers(line)
+ 
     def odd_orthography(self, word_1, word_2):
         """ Returns True if the orthography is a little weird
         between word one and word two.

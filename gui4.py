@@ -47,7 +47,7 @@ class BaseFrame(wx.Frame):
                 if line:
                     self.proper_nouns.add(line)
 
-        self.errors = []
+        self.possible_proper_nouns = []
 	# Make Panel
 	self.panel = wx.Panel(self, -1)
         self.current_text = rcs.RowColSizer()
@@ -81,18 +81,19 @@ class BaseFrame(wx.Frame):
         self.Destroy()
 
     def OnEdit(self, event):
+        print event.GetString()
         self.line.set_text(event.GetString())
         self.OnPreviousLine(None)
 
     def OnPreviousLine(self, event):
-        self.errors = []
+        self.possible_proper_nouns = []
         old_page_nbr = self.page_nbr
         self.page_nbr, self.line = self.lm.previous_line(self.page_nbr, self.line)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
         
     def OnNextLine(self, event):
-        self.errors = []
+        self.possible_proper_nouns = []
         old_page_nbr = self.page_nbr
         self.page_nbr, self.line = self.lm.next_line(self.page_nbr, self.line)
         self.pageCtrl.SetValue(str(self.page_nbr))

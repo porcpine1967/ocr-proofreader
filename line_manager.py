@@ -189,9 +189,11 @@ class LineManager(object):
         found = not bool(start_page_nbr and start_line)
         proper_nouns = []	
         try:
-            hold_word = start_line.text.split()[-1]
+            hold_words = start_line.text.split()[-2:]
+            hold_line = start_line.text
         except AttributeError:
-            hold_word = ''
+            hold_line = ''
+            hold_words = [''] 
         for page_nbr in self.page_numbers:
             if int(page_nbr) < int(start_page_nbr):
                 continue
@@ -199,15 +201,28 @@ class LineManager(object):
             for line in lines:
                 if found:
                     proper_nouns.extend([w for w in self.spell_checker.odd_punctuation(line.text)])
-                    for word in line.text.split(): 
-                        
-                        if self.spell_checker.strip_garbage(word) not in skip_list:
-                            if self.spell_checker.proper_noun(hold_word, word):
-                                proper_nouns.append(word)
-                        if word:
-                            hold_word = word
+#                   for word in line.text.split(): 
+#                       
+#                       if self.spell_checker.strip_garbage(word) not in skip_list:
+#                           if self.spell_checker.proper_noun(''.join(hold_words), word):
+#                               proper_nouns.append(word)
+#                       if word:
+#                           try:
+#                               hold_words = [hold_words.pop(), word,]
+#                           except IndexError:
+#                               hold_words = [word,]
+                    caps = self.spell_checker.proper_nouns(u'{} {}'.format(hold_line, line.text))
+                    for cap in caps:
+                        if cap not in skip_list and cap in line.text:
+                            proper_nouns.append(cap)
+                    bad_lowers = self.spell_checker.lower_after_sentence(u'{} {}'.format(hold_line, line.text))
+                    for bl in bad_lowers:
+                        if bl in line.text:
+                            proper_nouns.append(bl)
                     if proper_nouns:
                         return page_nbr, line, proper_nouns
+                    if line.text.strip():
+                        hold_line = line.text.strip()
                 elif line == start_line:
                     found = True
         return '0', None, proper_nouns
@@ -485,23 +500,23 @@ class Line(object):
         self.words = []
         self.build_words()
 
-    def set_text(self, text):
+    def set_text(self, text, quick_fix=True):
         self.text = text
         self._built = False
         self.words = []
-        self.rebuild()
+        self.rebuild(False)
 
-    def rebuild(self):
-        self.build_words()
+    def rebuild(self, quick_fix=True):
+        self.build_words(quick_fix=quick_fix)
         self.text = ' '.join([w.text for w in self.words if w.text])
 
-    def build_words(self, skip_spell_check=False):
+    def build_words(self, skip_spell_check=False, quick_fix=True):
         if self._built:
             return
         
         already_spell_checked = skip_spell_check or not self.spell_checker.check_line(self.text)
 	for w in self.text.split():
-            self.words.append(Word(w, self.spell_checker, already_spell_checked))
+            self.words.append(Word(w, self.spell_checker, already_spell_checked, quick_fix))
         self._built = True
         self.rebuild()
 
@@ -619,12 +634,13 @@ class Page(object):
 
 class Word(object):
     """ Actually, the holder of a space-separated chunk of text."""
-    def __init__(self, raw_text, spell_checker, already_spell_checked=False):
+    def __init__(self, raw_text, spell_checker, already_spell_checked=False, quick_fix=True):
         self.raw_text = raw_text
         self.text = raw_text
         self.spell_checker = spell_checker
         self.checked = False
-        self.quick_fix()
+        if quick_fix:
+            self.quick_fix()
         self.verify(already_spell_checked)
 
     def quick_fix(self):

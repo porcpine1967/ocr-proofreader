@@ -115,7 +115,7 @@ class SpellCheckTester(unittest.TestCase):
             ('!\'', 'Bob', False),
             )
         for preceding_word, test, expected in to_test:
-            self.assertEquals(sc.proper_noun(preceding_word, test), expected, '{} properness should be {}'.format(test, expected))
+            self.assertEquals(bool(sc.proper_noun(preceding_word, test)), expected, '{} properness should be {}'.format(test, expected))
     def test_french_check(self):
         to_test = (
             ('.Vaurais', "J'aurais"),
@@ -139,5 +139,24 @@ class SpellCheckTester(unittest.TestCase):
         sc = spell_checker.StubSpellChecker([])
         for word, expected in words:
             self.assertEquals(expected, sc.strip_garbage(word))
+    def test_proper_nouns(self):
+        lines = (
+            (u'12 \xab Jai bien connu Bob Gaston Chemineau, dit Angoua', ['Jai', 'Bob', 'Gaston', 'Chemineau', 'Angoua',]),
+            (u'12 \xab Jai bien connu Gaston Chemineau, dit Angoua', ['Jai', 'Gaston', 'Chemineau', 'Angoua',]),
+            ('I know Tim Smith-Klein', ['Tim', 'Smith', 'Klein',]),
+            ('It is true, But it is not True. I thinks so', ['But','True',]),
+            ('It is true, But it is not true. I thinks so', ['But',]),
+        )
+        sc = spell_checker.StubSpellChecker([])
+        for line, expected in lines:
+            self.assertEquals(sc.proper_nouns(line), expected)
+    def test_improper_lower(self):
+        lines = (
+            ('This is true. but not really', ['but',]),
+        )
+        sc = spell_checker.StubSpellChecker([])
+        for line, expected in lines:
+            self.assertEquals(sc.lower_after_sentence(line), expected)
+
 if __name__ == '__main__':
     unittest.main()
