@@ -39,8 +39,7 @@ class LineManagerTester(unittest.TestCase):
             self.assertEqual(line.first_word(), expected)
 
     def test_fix_hyphen(self):
-        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall',),
-            {'sp-_ain': 'spain'})
+        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall',))
         line_one = Line('the rains in sp-', 1, sp)
         line_two = Line('ain fall', 2, sp)
         lm = LineManager(sp, verbose=False)
@@ -49,8 +48,7 @@ class LineManagerTester(unittest.TestCase):
         self.assertEqual('spain fall', line_two.text)
 
     def test_fix_lines(self):
-        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall', 'spa-n',),
-            {'sp-_ain': 'spain', 'ra-_ins' : 'rains'})
+        sp = StubSpellChecker(('the', 'rains', 'in', 'spain', 'fall', ))
         lm = LineManager(sp, verbose=False)
         lm.load('hyphen_test')
         lm.join_lines()

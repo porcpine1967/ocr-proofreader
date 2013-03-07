@@ -407,7 +407,7 @@ class LineManager(object):
                     if line.valid:
                         if line.manual_fix:
                             f.write('# FIX ME {}\n'.format(line.manual_fix))
-                        f.write(line.text)
+                        f.write(re.sub('<br>', '\n', line.text, flags=re.UNICODE))
                         f.write('\n')
 
     def join_lines(self):

@@ -136,21 +136,30 @@ class SpellcheckDocMaker(object):
         fixes = self.fixed_words(bad_words)
 	print '{} fixes'.format(len(fixes))
 	still_bad = Counter()
+        solos = []
+        multis = []
+        for bad_version, bad_word in sorted(bad_bad_map.items(), key=lambda x: x[0]):
+            try:
+                good_versions = fixes[bad_word]
+                # remove hyphened versions if others are present
+                if not '-' in bad_word:
+                    good_unhyphened = [word for word in good_versions if not '-' in word]
+                    if good_unhyphened:
+                        good_versions = good_unhyphened
+                fixed_good_versions = []
+                for version in good_versions:
+                    fixed_good_versions.append(bad_version.replace(bad_word, version))
+                if len(fixed_good_versions) > 1:
+                    multis.append((bad_version, fixed_good_versions,))
+                elif fixed_good_versions:
+                    solos.append((bad_version, fixed_good_versions,))
+            except KeyError:
+                still_bad[bad_word] += 1
         with codecs.open('{}/word_fixes.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
-            for bad_version, bad_word in sorted(bad_bad_map.items(), key=lambda x: x[0]):
-                try:
-                    good_versions = fixes[bad_word]
-                    # remove hyphened versions if others are present
-                    if not '-' in bad_word:
-                        good_unhyphened = [word for word in good_versions if not '-' in word]
-                        if good_unhyphened:
-                            good_versions = good_unhyphened
-                    fixed_good_versions = []
-                    for version in good_versions:
-                        fixed_good_versions.append(bad_version.replace(bad_word, version))
-                    f.write(u'{}|{}\n'.format(bad_version, self.delimiter.join(fixed_good_versions)))
-                except KeyError:
-                    still_bad[bad_word] += 1
+            for bad_version, fixed_good_versions in multis:
+                f.write(u'{}|{}\n'.format(bad_version, self.delimiter.join(fixed_good_versions)))
+            for bad_version, fixed_good_versions in solos:
+                f.write(u'{}|{}\n'.format(bad_version, self.delimiter.join(fixed_good_versions)))
         with codecs.open('{}/bad_words.txt'.format(self.output_dir), mode='wb', encoding='utf-8') as f:
             for bad_word, cnt in still_bad.most_common():
                 f.write(u'{:>20}: {:>3}\n'.format(bad_word, cnt))
@@ -243,10 +252,12 @@ class SpellcheckDocMaker(object):
             writer = csv.writer(f)
 
             for fn in os.listdir(text_dir_):
+                print fn
                 name, extension = os.path.splitext(fn)
                 text_path = '{}/{}.txt'.format(text_dir_, name)
                 image_path = '{}/{}.pbm'.format(images_dir_, name)
                 if extension == '.txt' and os.path.exists(image_path):
+                    print 'in'    
                     sys.stdout.write('.')
                     pi = PageInfo(image_path, text_path)
                     page_lines = pi.line_guess()

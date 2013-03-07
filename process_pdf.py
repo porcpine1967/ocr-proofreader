@@ -296,6 +296,32 @@ class PdfProcessor(object):
                 current_page += 1
         os.chdir(self.project_path)
 
+class TiffProcessor(PdfProcessor):
+    """ Same thing, but for multipage tiff files."""
+    def __init__(self, verbose=False):
+        PdfProcessor.__init__(self, verbose)
+
+    def extract_images_from_pdfs(self):
+        os.chdir(self.project_path)
+        for full_filename in os.listdir('pdfs'):
+            os.chdir(self.project_path)
+            if full_filename.endswith('tiff'):
+                filename, ext = os.path.splitext(full_filename)
+                working_dir = 'images/raw/{}'.format(filename)
+                maybe_make_dir(working_dir)
+                shutil.copy('pdfs/{}'.format(full_filename), working_dir)
+                os.chdir(working_dir)
+                os.system('tiffsplit {}'.format(full_filename))
+                os.remove(full_filename)
+                for idx, tiffname in enumerate(sorted(os.listdir('.'))):
+                    if tiffname.endswith('tif'):
+                        cmd = 'tifftopnm -respectfillorder {} > {}-{:03d}.pbm'.format(tiffname, filename, idx)
+                        if self.verbose:
+                            print cmd
+                        os.system(cmd)
+                        os.remove(tiffname)
+        os.chdir(self.project_path)
+
 def maybe_make_dir(dir_):
     try:
         os.makedirs(dir_)

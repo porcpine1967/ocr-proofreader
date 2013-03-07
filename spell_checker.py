@@ -124,6 +124,14 @@ class BaseSpellFixer(object):
             (re.compile(r'(...)-.*', flags=re.UNICODE), r'\1'),
         ]   
 
+class SimpleEnglishSpellFixer(BaseSpellFixer):
+    def __init__(self):
+        super(SimpleEnglishSpellFixer, self).__init__()
+        self.letter_fixes = [
+            (re.compile(r'0'), u'o', '',),
+            (re.compile(r'l'), u'f', '',),
+            (re.compile('rn'), u'm', '',),
+        ]       
 class EnglishSpellFixer(BaseSpellFixer):
     def __init__(self):
         super(EnglishSpellFixer, self).__init__()
@@ -157,39 +165,18 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(r'\bel\b', flags=re.UNICODE), u'et', 'el-to-et',),
         ])
         self.letter_fixes.extend([
-            # replace c with cedilla
-            (re.compile(r'c', flags=re.UNICODE), u'\u00E7', u'c-to-\u00E7',),
-            # replace a with a accent acute
-            (re.compile(u'[a\u00E3\u00E4\u00E5\u00E0\u00E2]', flags=re.UNICODE), u'\u00E1', u'a-to-\u00E1',),
             # replace a with a accent grave
-            (re.compile(u'[a\u00E3\u00E4\u00E5\u00E1\u00E2]', flags=re.UNICODE), u'\u00E0', u'a-to-\u00E0',),
-            # replace a with a circumflex
-            (re.compile(u'[a\u00E3\u00E4\u00E5\u00E0\u00E1]', flags=re.UNICODE), u'\u00E2', u'a-to-\u00E2',),
+            (re.compile(u'a', flags=re.UNICODE), u'\u00E0', u'a-to-\u00E0',),
+            # replace a-tilde with a circumflex
+            (re.compile(u'\u00E1', flags=re.UNICODE), u'\u00E2', u'a-to-\u00E2',),
             # replace e with e accent acute
-            (re.compile(u'[e\u00EB\u00E8\u00EA]', flags=re.UNICODE), u'\u00E9', u'e-to-\u00E9',),
+            (re.compile(u'e', flags=re.UNICODE), u'\u00E9', u'e-to-\u00E9',),
             # replace e with e accent grave
-            (re.compile(u'[e\u00EB\u00E9\u00EA]', flags=re.UNICODE), u'\u00E8', u'e-to-\u00E8',),
-            # replace e with e circumflex
-            (re.compile(u'[e\u00EB\u00E8\u00E9]', flags=re.UNICODE), u'\u00EA', u'e-to-\u00EA',),
+            (re.compile(u'e', flags=re.UNICODE), u'\u00E8', u'e-to-\u00E8',),
             # replace accented i with plain i
-            (re.compile(u'[\u00EF\u00ED\u00EC\u00EE]', flags=re.UNICODE), u'i', u'odd-i-to-i',),
-            # replace i with i accent acute
-            (re.compile(u'[i\u00EF\u00EC\u00EE]', flags=re.UNICODE), u'\u00ED', u'i-to-\u00ED',),
+            (re.compile(u'\u00EC', flags=re.UNICODE), u'i', u'odd-i-to-i',),
             # replace i with i accent grave
-            (re.compile(u'[i\u00EF\u00ED\u00EE]', flags=re.UNICODE), u'\u00EC', u'i-to-\u00EC',),
-            # replace i with i circumflex
-            (re.compile(u'[i\u00EF\u00EC\u00ED]', flags=re.UNICODE), u'\u00EE', u'i-to-\u00EE',),
-            # replace o with o accent acute
-            (re.compile(u'[o\u00F7\u00F6\u00F5\u00F2\u00F4]', flags=re.UNICODE), u'\u00F3', u'o-to-\u00F3',),
-            # replace o with o accent grave
-            (re.compile(u'[o\u00F7\u00F6\u00F5\u00F3\u00F4]', flags=re.UNICODE), u'\u00F2', u'o-to-\u00F2',),
-            # replace o with o circumflex
-            (re.compile(u'[o\u00F7\u00F6\u00F5\u00F2\u00F3]', flags=re.UNICODE), u'\u00F4', u'o-to-\u00F4',),
-            # replace u with u accent acute
-            (re.compile(u'[u\u00FC\u00F9\u00FB]', flags=re.UNICODE), u'\u00FA', u'u-to-\u00FA',),
-            # replace u with u accent grave
-            (re.compile(u'[u\u00FC\u00FA\u00FB]', flags=re.UNICODE), u'\u00F9', u'u-to-\u00F9',),
-            # replace u with u circumflex
+            (re.compile(u'i', flags=re.UNICODE), u'\u00EC', u'i-to-\u00EC',),
             (re.compile(u'[u\u00FC\u00F9\u00FA]', flags=re.UNICODE), u'\u00FB', u'u-to-\u00FB',),
             # replace starts-with-dot-P with J'
             (re.compile(u'\\.P({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"J'\1", u'.Px-to-J\'x',),
@@ -427,8 +414,8 @@ class BaseSpellChecker(object):
             changed_versions = list(set(changed_versions))
                 # try replacing between one and all - TODO
         changed_versions.remove((word, '', ''))
-        for hyphenate in self.hyphenated_versions(word):
-            changed_versions.append((hyphenate[0], word, hyphenate[1],))
+#       for hyphenate in self.hyphenated_versions(word):
+#           changed_versions.append((hyphenate[0], word, hyphenate[1],))
         return set(changed_versions)
 
     def fix_spelling(self, word):
@@ -441,7 +428,7 @@ class BaseSpellChecker(object):
         if not spell_version:
             return word
         
-        changed_versions = self.transformed_variations(spell_version)
+        changed_versions = self.transformed_variations(word)
 
         good_versions = []
 	if changed_versions:
@@ -460,7 +447,7 @@ class BaseSpellChecker(object):
         if good_versions:
             explanation = [t[1] for t in changed_versions if t[0] == good_versions[0]][0]
             self.log_fix('spell_fix', explanation, spell_version, good_versions[0])
-            return word.replace(spell_version, good_versions[0])
+            return good_versions[0] #word.replace(spell_version, good_versions[0])
         else:
             # give up - cannot fix
             return word
@@ -497,12 +484,6 @@ class BaseSpellChecker(object):
         with codecs.open(self.log_file, mode='ab', encoding='utf-8') as f:
             f.write(self.format_string.format(context, expression, old_word, new_word))
 
-    def check_join(self, word_a, word_b):
-        key = u'{}_{}'.format(word_a, word_b)
-        try:
-            return self.line_join_fixes[key]
-        except KeyError:
-            return None
 
     def fix_line(self, line):
         """ Has all the words in the line fix themselves.
@@ -514,6 +495,24 @@ class BaseSpellChecker(object):
             word.correct_spelling()
             word.hyphenate()
         line.rebuild()       
+
+    def check_join(self, word_a, word_b):
+        """ Returns easy fix under certain conditions.
+
+        If word a ends with hyphen and word b lower case
+        always returns something.
+        if joining word a with word b without the hyphen
+        passes spell check, returns joined words.
+        else returns hyphenated version of word.
+        """
+        if ends_with_hyphen(word_a) and begins_with_lowercase(word_b):
+            fixed_word = word_a[:-1] + word_b
+            if self.check_line(fixed_word):
+                return word_a + word_b
+            else:
+                return fixed_word
+        else:
+            return None
 
 class StubSpellChecker(BaseSpellChecker):
     def __init__(self, correct_words, line_join_fixes={}):
@@ -639,6 +638,13 @@ class FileConfiguredSpellChecker(AspellSpellChecker):
         for idx, word in enumerate(words):
             words[idx] = self.fix_spelling(word)
         line.text = (u' '.join(words))
+
+    def check_join(self, word_a, word_b):
+        key = u'{}_{}'.format(word_a, word_b)
+        try:
+            return self.line_join_fixes[key]
+        except KeyError:
+            return None
 
 def valid_joinables(first_word, second_word, checker):
     """ Only returns joinables if would join. """

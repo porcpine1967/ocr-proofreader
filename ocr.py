@@ -2,7 +2,7 @@
 from argparse import ArgumentParser
 import codecs
 from collections import Counter
-from ConfigParser import ConfigParser
+from ConfigParser import ConfigParser, NoOptionError
 import csv
 import Image
 import os
@@ -10,11 +10,13 @@ import re
 import shutil
 import sys
 
+import comparison_manager
 import controller
 import process_pdf 
 import document_builder
 import line_manager
 import spell_checker
+import dpgui
 import gui
 import gui2
 import gui3
@@ -28,6 +30,11 @@ def test():
 #   proper_names()
 #   check_if_ok()
 #    examine_slices()
+
+    compare()
+def compare():
+    cm = comparison_manager.ComparisonManager()
+    cm.histogram_2()
 
 def examine_page(page_nbr):
     p = document_builder.PageInfo(
@@ -181,6 +188,14 @@ def run_gui4():
         config.set('process', 'last_proper_page', last_page)
     with open('book.cnf', 'wb') as f:
         config.write(f)
+def run_dpgui():
+    lang = get_lang()
+    lm = line_manager.LineManager(
+        spell_checker.AspellSpellChecker(lang, './dict.{}.pws'.format(lang))
+        )
+    lm.load('text/clean')
+    dpgui.main(lm)
+    lm.write_pages('text/clean', False)
 
 def run_gui(input_start_page, end_page, strict):
     """ Batch cleans the pages in text/clean."""
@@ -223,7 +238,7 @@ def new():
         os.mkdir('pdfs')
         for filename in os.listdir('.'):
             print filename
-            if filename.endswith('pdf'):
+            if filename.endswith('pdf') or filename.endswith('tiff'):
                 shutil.move(filename, 'pdfs')
     
     # Set up/update config
@@ -266,7 +281,7 @@ def interactive_configuration(config):
         config.set('extract_text', 'start_page_number', int(result))
 
     if not config.has_option('extract_text', 'ordered_dirnames'):
-        pdfs = [os.path.splitext(filename)[0] for filename in os.listdir('pdfs') if filename.endswith('pdf')]
+        pdfs = [os.path.splitext(filename)[0] for filename in os.listdir('pdfs') ]
         pdf_map = {}
         for idx, pdf in enumerate(sorted(pdfs)):
             pdf_map[idx + 1] = pdf
@@ -371,6 +386,24 @@ def _loaded_aspell_line_manager(start_page, end_page):
         )
     lm.load('text/clean')
     return lm
+def simple_clean():
+    """ Simple cleanup for testing algorithm. """
+    os.system('cp text/raw/* text/simple_clean/')
+    lang = get_lang()
+    checker = spell_checker.AspellSpellChecker(lang)
+#   checker.fixer = spell_checker.SimpleEnglishSpellFixer()
+    db = document_builder.SpellcheckDocMaker(checker)
+    db.remove_possible_headers('text/simple_clean')
+    lm = line_manager.LineManager(
+        spell_checker.FileConfiguredSpellChecker(lang)
+        )
+    lm.load('text/simple_clean')
+    lm.quick_fix()
+    lm.join_lines()
+#   lm.write_pages('text/simple_clean', False)
+#   db.make_word_fix_doc('text/simple_clean')
+    lm.write_pages('text/simple_clean', True)
+
 def clean(start_page, end_page):
     """ Batch cleans the pages in text/clean."""
 
@@ -422,8 +455,11 @@ def clean(start_page, end_page):
             pass
     lm.write_pages('text/clean', False)
 
-def extract_images(verbose):
-    pdf_processor = process_pdf.PdfProcessor(verbose)
+def extract_images(tiffs, verbose):
+    if tiffs:
+        pdf_processor = process_pdf.TiffProcessor(verbose)
+    else:
+        pdf_processor = process_pdf.PdfProcessor(verbose)
     pdf_processor.extract_images_from_pdfs()
     pdf_processor.extract_pages_from_images()
     
@@ -518,6 +554,7 @@ def run():
         'gui': 'g',
         'gui2': 'g2',
         'gui3': 'g3',
+        'dpgui': 'dp',
         'fix_spells': 'fs',
         'fix_all': 'fa',
         'fix_lines': 'fl',
@@ -525,6 +562,7 @@ def run():
         'symlink_images': 'si',
         'test': 't',
         'odd_punctuation': 'o',
+        'simple_clean': 'sc',
     }
     parser = ArgumentParser(
         description="Tool for converting images of books into corrected text"
@@ -561,6 +599,10 @@ def run():
         default=False,
         dest='strict',
         help='In gui, whether to use strict checking')
+    parser.add_argument('-tiffs', type=bool,
+        default=False,
+        dest='tiffs',
+        help='when processing, if the image files are tiff format')
     args = parser.parse_args()
     acceptable_actions = [item for pair in actions.items() for item in pair]
     if args.action not in acceptable_actions:
@@ -574,10 +616,10 @@ def run():
         else:
             examine_page(args.page_nbr)
     elif args.action in ('extract_all', 'e',):
-        extract_images(args.verbose)
+        extract_images(args.tiffs, args.verbose)
         extract_text(args.verbose)
     elif args.action in ('extract_images', 'i',):
-        extract_images(args.verbose)
+        extract_images(args.tiffs, args.verbose)
     elif args.action in ('symlink_images', 'si',):
         symlink_images(args.verbose)
     elif args.action in ('extract_text', 't',):
@@ -609,6 +651,8 @@ def run():
         possible_headers()
     elif args.action in ('fix_lines', 'ft',):
         cross_line_fixes()
+    elif args.action in ('dpgui', 'dp',):
+        run_dpgui()
     elif args.action in ('html', 'h',):
         run_gui3()
     elif args.action in ('gui', 'g'):
@@ -623,6 +667,8 @@ def run():
         run_gui3()
     elif args.action == 'odd_punctuation':
         run_gui4()
+    elif args.action in ('simple_clean', 'sc'):
+        simple_clean()
     else:
         test()
 #   process_pdfs()
