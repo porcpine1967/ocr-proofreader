@@ -1,5 +1,8 @@
 #!/usr/bin/env python
+"""
+Has html formatting keys, writes html file.
 
+"""
 import array
 import Image
 
@@ -90,8 +93,19 @@ class BaseFrame(wx.Frame):
         self.update_line(self.page_nbr)
     def OnAddParagraph(self, event):
         if self.line:
-#           self.line.set_text(u'<p style="font-family:monospace">{}'.format(self.line.text))
             self.line.set_text(u'<p>{}'.format(self.editCtrl.GetValue()))
+            self.OnNextLine(None)
+    def OnAddItalParagraph(self, event):
+        if self.line:
+            self.line.set_text(u'<p style="font-style: italic">{}'.format(self.editCtrl.GetValue()))
+            self.OnNextLine(None)
+    def OnAddRightAlignParagraph(self, event):
+        if self.line:
+            self.line.set_text(u'<p style="text-align: right">{}'.format(self.editCtrl.GetValue()))
+            self.OnNextLine(None)
+    def OnAddHeader(self, event):
+        if self.line:
+            self.line.set_text(u'<h2>{}</h2>'.format(self.editCtrl.GetValue()))
             self.OnNextLine(None)
  
     def update_line(self, old_page_nbr):
@@ -126,6 +140,20 @@ class BaseFrame(wx.Frame):
             self.current_text.Add(add_paragraph_button, row=button_row, col=1)
 
             button_row += 1
+            add_right_align_paragraph_button = wx.Button(self.panel, wx.ID_ANY, label='+ <p rl>', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnAddRightAlignParagraph, add_right_align_paragraph_button)
+            add_right_align_paragraph_button.SetDefault()
+            add_right_align_paragraph_button.SetSize(add_right_align_paragraph_button.GetBestSize())
+            self.current_text.Add(add_right_align_paragraph_button, row=button_row, col=1)
+
+            button_row += 1
+            add_ital_paragraph_button = wx.Button(self.panel, wx.ID_ANY, label='+ <i>', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnAddItalParagraph, add_ital_paragraph_button)
+            add_ital_paragraph_button.SetDefault()
+            add_ital_paragraph_button.SetSize(add_ital_paragraph_button.GetBestSize())
+            self.current_text.Add(add_ital_paragraph_button, row=button_row, col=1)
+
+            button_row += 1
             next_line_button = wx.Button(self.panel, wx.ID_ANY, label='Next Line', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnNextLine, next_line_button)
             next_line_button.SetDefault()
@@ -138,6 +166,13 @@ class BaseFrame(wx.Frame):
             previous_line_button.SetDefault()
             previous_line_button.SetSize(previous_line_button.GetBestSize())
             self.current_text.Add(previous_line_button, row=button_row, col=1)
+
+            button_row += 1
+            add_header_button = wx.Button(self.panel, wx.ID_ANY, label='header', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnAddHeader, add_header_button)
+            add_header_button.SetDefault()
+            add_header_button.SetSize(add_header_button.GetBestSize())
+            self.current_text.Add(add_header_button, row=button_row, col=1)
 
             # Sizers for layout
             self.panel.SetSizerAndFit(self.current_text)

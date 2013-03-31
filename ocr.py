@@ -31,7 +31,7 @@ def test():
 #   check_if_ok()
 #    examine_slices()
 
-    compare()
+#   compare()
 def compare():
     cm = comparison_manager.ComparisonManager()
     cm.histogram_2()
@@ -539,31 +539,31 @@ def write_html():
     lm.write_html(config)
 
 def run():
-    actions = {
-        'new': 'n',
-        'extract_all': 'e',
-        'extract_images': 'i',
-        'extract_text': 't',
-        'spell_check': 'a',
-        'interactive_spell_check': 'p',
-        'clean': 'c',
-        'fix': 'f',
-        'html': 'h',
-        'headers': 'hf',
-        'page_info': 'pi',
-        'gui': 'g',
-        'gui2': 'g2',
-        'gui3': 'g3',
-        'dpgui': 'dp',
-        'fix_spells': 'fs',
-        'fix_all': 'fa',
-        'fix_lines': 'fl',
-        'page_grid': 'pg',
-        'symlink_images': 'si',
-        'test': 't',
-        'odd_punctuation': 'o',
-        'simple_clean': 'sc',
-    }
+    actions = (
+        ('new', 'First thing to run.  Moves pdfs around and creates book.cnf'),
+        ('extract_all', 'Extracts images and text'),
+        ('extract_images', 'Extract page images from pdfs/tiffs'),
+        ('extract_text', 'Extracts text from images'),
+        ('page_info', 'Writes out page info for mapping lines to image location'),
+        ('spell_check', 'Writes maybe_ok file'),
+        ('gui2', 'Looks for words in maybe_ok to see if should add to dict'),
+        ('headers', 'Writes out possible headers and footers to files'),
+        ('clean', 'First time, removes headers and quick fixes; then joins lines, then fixes spelling'),
+        ('fix_spells', 'Looks for bad words, writes potential fixes to file'),
+        ('fix_all', 'Runs fix spells and fix lines'),
+        ('fix_lines', 'Looks for lines that should be joins and writes fixes to file'),
+        ('gui', 'Interactive spelling error finder and fixer (plus search)'),
+        ('html', 'gui for adding html tags'),
+        ('gui3', 'g3'),
+        ('dpgui', 'Gui for checking distributed proofreading texts'),
+        ('interactive_spell_check', 'Runs aspell on files in text/clean'),
+        ('page_grid', 'pg'),
+        ('symlink_images', 'si'),
+        ('test', 't'),
+        ('odd_punctuation', 'o'),
+        ('simple_clean', 'sc'),
+        ('fix', 'Interactive fix'),
+    )
     parser = ArgumentParser(
         description="Tool for converting images of books into corrected text"
         )
@@ -604,10 +604,11 @@ def run():
         dest='tiffs',
         help='when processing, if the image files are tiff format')
     args = parser.parse_args()
-    acceptable_actions = [item for pair in actions.items() for item in pair]
+    acceptable_actions = [action[0] for action in actions]
     if args.action not in acceptable_actions:
-        print 'Interactive mode not ready yet. Please try:'
-        print ', '.join(actions.keys())
+        print 'Please provide one of the following actions:'
+	for action, description in actions:
+            print '{:>15}: {}'.format(action, description)
     elif args.action in ('new', 'n',):
         new()
     elif args.action in ('page_grid', 'pg',):

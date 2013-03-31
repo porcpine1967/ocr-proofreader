@@ -90,9 +90,9 @@ class BaseFrame(wx.Frame):
                 self.page_image = Image.open('images/pages/{}.pbm'.format(self.page_nbr))
             self.imageCtrl.SetBitmap(pil_image_to_scaled_image(self.line.line_info.image(self.page_image, 1), WIDTH - 100))
             before_line, after_line, idx = self.lm.line_context(self.page_nbr, self.line)
-            text = '\n'.join((before_line, self.line.text, after_line,))
+            text = '\n'.join((before_line.text, self.line.text, after_line.text,))
             self.linesCtrl.SetValue(text)
-            self.linesCtrl.SetStyle(len(before_line), len(before_line) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
+            self.linesCtrl.SetStyle(len(before_line.text), len(before_line.text) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
         else:
             self.repeating = True
             self.linesCtrl.SetValue('')

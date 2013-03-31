@@ -184,13 +184,13 @@ class BaseFrame(wx.Frame):
             previous_line_button.SetDefault()
             previous_line_button.SetSize(previous_line_button.GetBestSize())
             self.current_text.Add(previous_line_button, row=button_row, col=1)
-            if self.strict:
-                button_row += 1
-                join_line_button = wx.Button(self.panel, wx.ID_ANY, label='Join Lines', size=(90, 30))
-                self.Bind(wx.EVT_BUTTON, self.OnJoinLines, join_line_button)
-                join_line_button.SetDefault()
-                join_line_button.SetSize(join_line_button.GetBestSize())
-                self.current_text.Add(join_line_button, row=button_row, col=1)
+
+            button_row += 1
+            join_line_button = wx.Button(self.panel, wx.ID_ANY, label='Join Lines', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnJoinLines, join_line_button)
+            join_line_button.SetDefault()
+            join_line_button.SetSize(join_line_button.GetBestSize())
+            self.current_text.Add(join_line_button, row=button_row, col=1)
 
             if self.speller:
                 button_row += 1

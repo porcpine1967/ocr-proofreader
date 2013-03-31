@@ -71,7 +71,7 @@ class BaseSpellFixer(object):
             (re.compile('0', flags=re.UNICODE), u'o', u'0-to-o',),
             (re.compile('5', flags=re.UNICODE), u's', u'5-to-s',),
             (re.compile(u'\\boo({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r'co\1', 'oo-to-co',),
-            (re.compile(u'{}{}{}'.format(REGEX_SMALL, REGEX_CAPITAL, REGEX_SMALL), flags=re.UNICODE), lambda m: m.group(0).lower(), 'xXx-to-xxx'),
+#           (re.compile(u'{}{}{}'.format(REGEX_SMALL, REGEX_CAPITAL, REGEX_SMALL), flags=re.UNICODE), lambda m: m.group(0).lower(), 'xXx-to-xxx'),
         ]
 	# things that need punctuation and therefore cannot be batched
 	self.punctuation_fixes = [
@@ -112,6 +112,7 @@ class BaseSpellFixer(object):
             re.compile(r"'\s", flags=re.UNICODE),
             re.compile(r"\s-[^\s]", flags=re.UNICODE),
             re.compile(r"[^\s]-\s", flags=re.UNICODE),
+            re.compile(r'(^|\s)"($|\s)', flags=re.UNICODE),
 	]	
 
 	self.ends_sentence = re.compile(r'.*[.?!]["\')]?$', re.UNICODE).match
@@ -404,6 +405,7 @@ class BaseSpellChecker(object):
                 # try replacing one at a time
                 if count > 1: # and u'\\' not in replace:
                     for match in regex.finditer(potential_fix):
+
                         new_word_2 = u'{}{}{}'.format(
                             potential_fix[:match.start()],
                             match.expand(replace),
