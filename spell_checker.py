@@ -71,7 +71,6 @@ class BaseSpellFixer(object):
             (re.compile('0', flags=re.UNICODE), u'o', u'0-to-o',),
             (re.compile('5', flags=re.UNICODE), u's', u'5-to-s',),
             (re.compile(u'\\boo({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r'co\1', 'oo-to-co',),
-#           (re.compile(u'{}{}{}'.format(REGEX_SMALL, REGEX_CAPITAL, REGEX_SMALL), flags=re.UNICODE), lambda m: m.group(0).lower(), 'xXx-to-xxx'),
         ]
 	# things that need punctuation and therefore cannot be batched
 	self.punctuation_fixes = [
@@ -108,6 +107,8 @@ class BaseSpellFixer(object):
             re.compile(r'\[', flags=re.UNICODE),
             re.compile(u'\xab\\S', flags=re.UNICODE),
             re.compile(r'\. \.', flags=re.UNICODE),
+            re.compile(r' \.$', flags=re.UNICODE),
+            re.compile(r' ,$', flags=re.UNICODE),
             re.compile(r"\s'", flags=re.UNICODE),
             re.compile(r"'\s", flags=re.UNICODE),
             re.compile(r"\s-[^\s]", flags=re.UNICODE),
@@ -117,7 +118,8 @@ class BaseSpellFixer(object):
 
 	self.ends_sentence = re.compile(r'.*[.?!]["\')]?$', re.UNICODE).match
         self.propers = re.compile(u'\w[^.!?]*?((?:[ ,-]?{}\w*)+)'.format(REGEX_CAPITAL), flags=re.UNICODE).findall
-        self.bad_lowers =  re.compile(u'[.!?]\W*({}\w*)'.format(REGEX_SMALL), flags=re.UNICODE).findall
+        self.not_propers = re.compile(u', ["\']{}'.format(REGEX_CAPITAL), flags=re.UNICODE)
+        self.bad_lowers =  re.compile(u'(?:[.!]|\?[^"])\W*({}\w*)'.format(REGEX_SMALL, REGEX_SMALL), flags=re.UNICODE).findall
         self.garbage_strippers = [
             (re.compile(r'"', flags=re.UNICODE), ''),
             (re.compile(r'[;:,.!?]$', flags=re.UNICODE), ''),
@@ -211,6 +213,8 @@ class FrenchSpellFixer(BaseSpellFixer):
             (re.compile(u'\\bnf({}{{3,}})'.format(REGEX_SMALL), flags=re.UNICODE), r"m'\1", u'nf-to-m-appos',),
             # 1(-') to l(-')
             (re.compile(u"\\b1[-']({}{}{{2,}})".format(REGEX_LETTER, REGEX_SMALL), flags=re.UNICODE), r"l'\1", u'1-dash-to-l-appos',),
+            # xXx to xxx
+            (re.compile(u'{}{}{}'.format(REGEX_SMALL, REGEX_CAPITAL, REGEX_SMALL), flags=re.UNICODE), lambda m: m.group(0).lower(), 'xXx-to-xxx'),
         ])
 
 	self.punctuation_fixes.extend([
@@ -225,6 +229,7 @@ class FrenchSpellFixer(BaseSpellFixer):
 	self.ends_sentence = re.compile(u'.*[.:?!](["\')]|[\u203A\xAB-]+)?$', re.UNICODE).match
         self.propers = re.compile(u'\w[^.:!?]*?((?:[ ,-]?{}(?:\'|\w*))+)'.format(REGEX_CAPITAL), flags=re.UNICODE).findall
         self.bad_lowers =  re.compile(u'\.\W*({}\w*)'.format(REGEX_SMALL), flags=re.UNICODE).findall
+
 class BaseSpellChecker(object):
     
     def __init__(self):
@@ -468,7 +473,8 @@ class BaseSpellChecker(object):
     def proper_nouns(self, line):
         """ Takes an array of lines and returns all proper nouns. """
         propers = []
-        for proper in self.fixer.propers(line):
+        to_check = self.fixer.not_propers.sub('a', line)
+        for proper in self.fixer.propers(to_check):
             propers.extend(w for w in re.split('[, -]', proper) if w)
         return propers
 

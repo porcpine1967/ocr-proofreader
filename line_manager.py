@@ -77,15 +77,17 @@ class LineManager(object):
     def load(self, raw_file_dir):
         """ Creates lines out of all the lines in a directory."""
         line_infos = defaultdict(lambda:[])
-        if os.path.exists('working/page_info.csv'):
-            with open('working/page_info.csv', 'rb') as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    line_info = LineInfo(int(row[3]))
-                    line_info.height = int(row[1])
-                    line_info.left_margin = int(row[2])
-                    line_info.width = int(row[4])
-                    line_infos[row[0]].append(line_info)
+        if os.path.exists('working/page_info'):
+            for filename in os.listdir('working/page_info'):
+                if filename.endswith('.csv'):
+                    with open('working/page_info/{}'.format(filename), 'rb') as f:
+                        reader = csv.reader(f)
+                        for row in reader:
+                            line_info = LineInfo(int(row[3]))
+                            line_info.height = int(row[1])
+                            line_info.left_margin = int(row[2])
+                            line_info.width = int(row[4])
+                            line_infos[row[0]].append(line_info)
         headers = set()
         if os.path.exists('working/headers.txt'):
             with open('working/headers.txt', 'rb') as f:
@@ -161,7 +163,7 @@ class LineManager(object):
                     found = True
         return '0', None
         
-    def next_line_to_check(self, start_page_nbr, start_line, log_bad=False, strict=False):
+    def next_line_to_check(self, start_page_nbr, start_line, log_bad=False, strict=False, skips=[]):
         """ Takes a page number and line and returns the next 
             page_nbr and line that should be checked and error list.
 
@@ -173,14 +175,14 @@ class LineManager(object):
             lines = self.pages[page_nbr]
             for line in lines:
                 if found:
-                    errors = line.should_check(log_bad, strict)
+                    errors = [error for error in line.should_check(log_bad, strict) if error not in skips]
                     if errors:
                         return page_nbr, line, errors
                 elif line == start_line:
                     found = True
         return '0', None, []
 
-    def next_proper_noun(self, start_page_nbr, start_line, skip_list):
+    def next_proper_noun(self, start_page_nbr, start_line, skip_list, abbreviations):
         """ Starting at start line, sees if word pairs
         imply that one or more of them is a proper noun.
         returns page nbr, line with proper nouns, and list of
@@ -200,7 +202,14 @@ class LineManager(object):
             lines = self.pages[page_nbr]
             for line in lines:
                 if found:
-                    proper_nouns.extend([w for w in self.spell_checker.odd_punctuation(line.text)])
+                    line_text = line.text
+                    if skip_list and abbreviations:
+                        sample_proper = skip_list.pop()
+                        skip_list.add(sample_proper)
+                        for abbreviation in abbreviations:
+                            line_text = line_text.replace(abbreviation, sample_proper)
+                    to_check = u'{} {}'.format(hold_line, line_text)
+                    proper_nouns.extend([w for w in self.spell_checker.odd_punctuation(line_text)])
 #                   for word in line.text.split(): 
 #                       
 #                       if self.spell_checker.strip_garbage(word) not in skip_list:
@@ -211,18 +220,18 @@ class LineManager(object):
 #                               hold_words = [hold_words.pop(), word,]
 #                           except IndexError:
 #                               hold_words = [word,]
-                    caps = self.spell_checker.proper_nouns(u'{} {}'.format(hold_line, line.text))
+                    caps = self.spell_checker.proper_nouns(to_check)
                     for cap in caps:
                         if cap not in skip_list and cap in line.text:
                             proper_nouns.append(cap)
-                    bad_lowers = self.spell_checker.lower_after_sentence(u'{} {}'.format(hold_line, line.text))
+                    bad_lowers = self.spell_checker.lower_after_sentence(to_check)
                     for bl in bad_lowers:
                         if bl in line.text:
                             proper_nouns.append(bl)
                     if proper_nouns:
                         return page_nbr, line, proper_nouns
-                    if line.text.strip():
-                        hold_line = line.text.strip()
+                    if line_text.strip():
+                        hold_line = line_text.strip()
                 elif line == start_line:
                     found = True
         return '0', None, proper_nouns

@@ -91,6 +91,16 @@ class BaseFrame(wx.Frame):
                 last_word = self.line.pop_last_word()
                 next_line.set_text(last_word + next_line.text)
         self.update_line(self.page_nbr)
+    def OnAddItalSelection(self, event):
+        if self.line:
+            to, from_ = self.editCtrl.GetSelection()
+            val = self.editCtrl.GetValue()
+            self.editCtrl.SetValue('{}{}{}{}{}'.format(val[:to], '<i>', val[to:from_], '</i>', val[from_:]))
+            self.editCtrl.SetFocus()
+    def OnAddSection(self, event):
+        if self.line:
+            self.line.set_text(u'<p>-<p>{}'.format(self.editCtrl.GetValue()))
+            self.OnNextLine(None)
     def OnAddParagraph(self, event):
         if self.line:
             self.line.set_text(u'<p>{}'.format(self.editCtrl.GetValue()))
@@ -140,11 +150,25 @@ class BaseFrame(wx.Frame):
             self.current_text.Add(add_paragraph_button, row=button_row, col=1)
 
             button_row += 1
+            add_section_button = wx.Button(self.panel, wx.ID_ANY, label='+ <p>-<p>', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnAddSection, add_section_button)
+            add_section_button.SetDefault()
+            add_section_button.SetSize(add_section_button.GetBestSize())
+            self.current_text.Add(add_section_button, row=button_row, col=1)
+
+            button_row += 1
             add_right_align_paragraph_button = wx.Button(self.panel, wx.ID_ANY, label='+ <p rl>', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnAddRightAlignParagraph, add_right_align_paragraph_button)
             add_right_align_paragraph_button.SetDefault()
             add_right_align_paragraph_button.SetSize(add_right_align_paragraph_button.GetBestSize())
             self.current_text.Add(add_right_align_paragraph_button, row=button_row, col=1)
+
+            button_row += 1
+            add_ital_selection_button = wx.Button(self.panel, wx.ID_ANY, label='<i>..</i>', size=(90, 30))
+            self.Bind(wx.EVT_BUTTON, self.OnAddItalSelection, add_ital_selection_button)
+            add_ital_selection_button.SetDefault()
+            add_ital_selection_button.SetSize(add_ital_selection_button.GetBestSize())
+            self.current_text.Add(add_ital_selection_button, row=button_row, col=1)
 
             button_row += 1
             add_ital_paragraph_button = wx.Button(self.panel, wx.ID_ANY, label='+ <i>', size=(90, 30))

@@ -29,7 +29,7 @@ def test():
 #   remove_headers()
 #   proper_names()
 #   check_if_ok()
-#    examine_slices()
+#   examine_slices()
 
 #   compare()
 def compare():
@@ -41,11 +41,11 @@ def examine_page(page_nbr):
         'images/pages/{}.pbm'.format(page_nbr),
         'text/raw/{}.txt'.format(page_nbr)
         )
-    p.grid_version('page_{}.pbm'.format(page_nbr))
+    p.grid_version('page_{}.png'.format(page_nbr))
 def examine_slices():
-    page_nbr = 431
+    page_nbr = 277
     im = Image.open('images/pages/{}.pbm'.format(page_nbr))
-    with open('working/page_info.csv', 'rb') as f:
+    with open('working/page_info/{}.csv'.format(page_nbr), 'rb') as f:
         reader = csv.reader(f)
         for idx, row in enumerate(reader):
             if int(row[0]) == page_nbr:
@@ -553,6 +553,7 @@ def run():
         ('fix_all', 'Runs fix spells and fix lines'),
         ('fix_lines', 'Looks for lines that should be joins and writes fixes to file'),
         ('gui', 'Interactive spelling error finder and fixer (plus search)'),
+        ('odd_punctuation', 'Looks for odd punctuation'),
         ('html', 'gui for adding html tags'),
         ('gui3', 'g3'),
         ('dpgui', 'Gui for checking distributed proofreading texts'),
@@ -560,7 +561,6 @@ def run():
         ('page_grid', 'pg'),
         ('symlink_images', 'si'),
         ('test', 't'),
-        ('odd_punctuation', 'o'),
         ('simple_clean', 'sc'),
         ('fix', 'Interactive fix'),
     )

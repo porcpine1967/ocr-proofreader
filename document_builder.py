@@ -248,15 +248,18 @@ class SpellcheckDocMaker(object):
         return good_changes
 
     def page_image_info(self, text_dir_, images_dir_):
-        with open('working/page_info.csv', 'wb') as f:
-            writer = csv.writer(f)
-
-            for fn in os.listdir(text_dir_):
-                print fn
-                name, extension = os.path.splitext(fn)
-                text_path = '{}/{}.txt'.format(text_dir_, name)
-                image_path = '{}/{}.pbm'.format(images_dir_, name)
-                if extension == '.txt' and os.path.exists(image_path):
+        if not os.path.exists('working/page_info'):
+            print 'shit'
+            os.makedirs('working/page_info')
+            return
+        for fn in os.listdir(text_dir_):
+            print fn
+            name, extension = os.path.splitext(fn)
+            text_path = '{}/{}.txt'.format(text_dir_, name)
+            image_path = '{}/{}.pbm'.format(images_dir_, name)
+            if extension == '.txt' and os.path.exists(image_path):
+                with open('working/page_info/{}.csv'.format(name), 'wb') as f:
+                    writer = csv.writer(f)
                     print 'in'    
                     sys.stdout.write('.')
                     pi = PageInfo(image_path, text_path)
@@ -364,11 +367,12 @@ class PageInfo(object):
 
     def grid_version(self, output_file_name):
         im = Image.open(self.path_to_image)
+        im = im.convert('RGBA')
         d = ImageDraw.Draw(im)
         width, height = im.size
         for idx, line in enumerate(self.line_guess()):
-            d.line((0, line.y, width, line.y,))
-        im.save(output_file_name)
+            d.line((0, line.y, width, line.y,), fill=(255,0,0))
+        im.save(output_file_name, 'PNG')
 
     def chopped_version(self, output_file_path, header_offset=0):
         """ Outputs one file per line.

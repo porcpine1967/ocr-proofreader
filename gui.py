@@ -44,6 +44,7 @@ class BaseFrame(wx.Frame):
         self.line = None
         self.repeating = False
         self.errors = []
+        self.skips = []
         self.speller = None
         self.strict = False
 	# Make Panel
@@ -115,7 +116,7 @@ class BaseFrame(wx.Frame):
         
     def OnNextBadLine(self, event):
         old_page_nbr = self.page_nbr
-        self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating, strict=self.strict)
+        self.page_nbr, self.line, self.errors = self.lm.next_line_to_check(self.page_nbr, self.line, self.repeating, strict=self.strict, skips=self.skips)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
 
@@ -199,8 +200,22 @@ class BaseFrame(wx.Frame):
                 add_to_dictionary_button.SetDefault()
                 add_to_dictionary_button.SetSize(add_to_dictionary_button.GetBestSize())
                 self.current_text.Add(add_to_dictionary_button, row=button_row, col=1)
+
+                button_row += 1
+                add_to_skips_button = wx.Button(self.panel, wx.ID_ANY, label='+ to Skips', size=(90, 30))
+                self.Bind(wx.EVT_BUTTON, self.OnAddToSkips, add_to_skips_button)
+                add_to_skips_button.SetDefault()
+                add_to_skips_button.SetSize(add_to_skips_button.GetBestSize())
+                self.current_text.Add(add_to_skips_button, row=button_row, col=1)
             # Sizers for layout
             self.panel.SetSizerAndFit(self.current_text)
+    def OnAddToSkips(self, event):
+        if self.line:
+            for word in self.errors:
+                self.skips.append(word)
+            self.line.recheck()
+            self.OnPreviousLine(None)
+
     def OnAddToDict(self, event):
         if self.line:
             errors = self.spell_checker.check_line(self.line.text)

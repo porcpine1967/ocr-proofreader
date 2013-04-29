@@ -126,7 +126,7 @@ class SpellCheckTester(unittest.TestCase):
         sc.fixer = spell_checker.FrenchSpellFixer()
         for word, variation in to_test:
             tvs = sc.transformed_variations(word)
-            self.assertTrue(variation in [s[0] for s in tvs])        
+            self.assertTrue(variation in [s[0] for s in tvs], variation)        
     def test_strict_check(self):
         sc = spell_checker.StubSpellChecker([])
         sc.fixer = spell_checker.FrenchSpellFixer()
@@ -146,6 +146,7 @@ class SpellCheckTester(unittest.TestCase):
             ('I know Tim Smith-Klein', ['Tim', 'Smith', 'Klein',]),
             ('It is true, But it is not True. I thinks so', ['But','True',]),
             ('It is true, But it is not true. I thinks so', ['But',]),
+            ('He said, "Anything is fine."', []),
         )
         sc = spell_checker.StubSpellChecker([])
         for line, expected in lines:
@@ -153,6 +154,8 @@ class SpellCheckTester(unittest.TestCase):
     def test_improper_lower(self):
         lines = (
             ('This is true. but not really', ['but',]),
+            ('"Is this true?" he asked.', []),
+            ('Is this true? he asked.', ['he', ]),
         )
         sc = spell_checker.StubSpellChecker([])
         for line, expected in lines:

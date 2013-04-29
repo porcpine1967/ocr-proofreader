@@ -46,6 +46,14 @@ class BaseFrame(wx.Frame):
                 line = l.strip()
                 if line:
                     self.proper_nouns.add(line)
+        self.abbreviations = set()
+        with codecs.open('working/abbreviations.txt', mode='ab', encoding='utf-8') as f:
+            pass
+        with codecs.open('working/abbreviations.txt', mode='rb', encoding='utf-8') as f:
+            for l in f:
+                line = l.strip()
+                if line:
+                    self.abbreviations.add(line)
 
         self.possible_proper_nouns = []
 	# Make Panel
@@ -101,7 +109,7 @@ class BaseFrame(wx.Frame):
 
     def OnNextBadLine(self, event):
         old_page_nbr = self.page_nbr
-        self.page_nbr, self.line, self.possible_proper_nouns = self.lm.next_proper_noun(self.page_nbr, self.line, self.proper_nouns)
+        self.page_nbr, self.line, self.possible_proper_nouns = self.lm.next_proper_noun(self.page_nbr, self.line, self.proper_nouns, self.abbreviations)
         self.pageCtrl.SetValue(str(self.page_nbr))
         self.update_line(old_page_nbr)
 
