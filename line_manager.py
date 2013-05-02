@@ -80,6 +80,7 @@ class LineManager(object):
         if os.path.exists('working/page_info'):
             for filename in os.listdir('working/page_info'):
                 if filename.endswith('.csv'):
+                    print 'parsing', filename
                     with open('working/page_info/{}'.format(filename), 'rb') as f:
                         reader = csv.reader(f)
                         for row in reader:
@@ -636,6 +637,7 @@ class Page(object):
             else:
                 line.line_info = self.line_infos[len(self.lines)]
         except IndexError:
+            print 'index error', len(self.line_infos), len(self.lines)
             if self.line_infos:
                 line.line_info = self.line_infos[-1]
         self.lines.append(line)

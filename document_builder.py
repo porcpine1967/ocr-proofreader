@@ -249,9 +249,8 @@ class SpellcheckDocMaker(object):
 
     def page_image_info(self, text_dir_, images_dir_):
         if not os.path.exists('working/page_info'):
-            print 'shit'
             os.makedirs('working/page_info')
-            return
+
         for fn in os.listdir(text_dir_):
             print fn
             name, extension = os.path.splitext(fn)

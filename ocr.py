@@ -21,6 +21,7 @@ import gui
 import gui2
 import gui3
 import gui4
+import gui5
 
 def test():
     """ Whatever is being worked on."""
@@ -188,6 +189,10 @@ def run_gui4():
         config.set('process', 'last_proper_page', last_page)
     with open('book.cnf', 'wb') as f:
         config.write(f)
+
+def run_gui5(page_nbr):
+    app = gui5.main(page_nbr)
+
 def run_dpgui():
     lang = get_lang()
     lm = line_manager.LineManager(
@@ -563,6 +568,7 @@ def run():
         ('test', 't'),
         ('simple_clean', 'sc'),
         ('fix', 'Interactive fix'),
+        ('fix_page_info', 'Adjust the page info lines'),
     )
     parser = ArgumentParser(
         description="Tool for converting images of books into corrected text"
@@ -668,6 +674,8 @@ def run():
         run_gui3()
     elif args.action == 'odd_punctuation':
         run_gui4()
+    elif args.action == 'fix_page_info':
+        run_gui5(args.start)
     elif args.action in ('simple_clean', 'sc'):
         simple_clean()
     else:

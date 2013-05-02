@@ -87,6 +87,7 @@ class BaseFrame(wx.Frame):
         self.errorsCtrl.SetValue(self.word)
         if self.line:
             if old_page_nbr != self.page_nbr:
+                print 'opening', self.page_nbr
                 self.page_image = Image.open('images/pages/{}.pbm'.format(self.page_nbr))
             self.imageCtrl.SetBitmap(pil_image_to_scaled_image(self.line.line_info.image(self.page_image, 1), WIDTH - 100))
             before_line, after_line, idx = self.lm.line_context(self.page_nbr, self.line)
@@ -94,7 +95,7 @@ class BaseFrame(wx.Frame):
             self.linesCtrl.SetValue(text)
             self.linesCtrl.SetStyle(len(before_line.text), len(before_line.text) + len(self.line.text) + 1, wx.TextAttr('Black', 'Yellow'))
         else:
-            self.repeating = True
+            print 'not found'
             self.linesCtrl.SetValue('')
 
     def set_line_manager(self, line_manager_):
@@ -123,6 +124,7 @@ class BaseFrame(wx.Frame):
         if self.word:
             self.speller.addtoPersonal(self.word)
             self.speller.saveAllwords()
+        self.OnNextBadLine(None)
 
 def pil_image_to_scaled_image(pil_image, desired_width):
     bytes_ = []
