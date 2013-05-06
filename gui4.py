@@ -83,7 +83,7 @@ class BaseFrame(wx.Frame):
 
     def OnClose(self, event):
         with codecs.open('working/proper_nouns.txt', mode='wb', encoding='utf-8') as f:
-            for word in self.proper_nouns:
+            for word in sorted(self.proper_nouns):
                 f.write(u'{}\n'.format(word))
         self.last_page_callback(self.page_nbr)
         self.Destroy()
