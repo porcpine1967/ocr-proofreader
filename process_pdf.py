@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from ConfigParser import ConfigParser
 import os
 import shutil
+import subprocess
 import sys
 import Image
 
@@ -295,6 +296,66 @@ class PdfProcessor(object):
                 os.symlink(os.path.abspath(source_file), '{}/{}.pbm'.format(linked_images_dir, current_page))
                 current_page += 1
         os.chdir(self.project_path)
+
+    def expand_pdfs(self):
+        # make sure only one pdf in folder
+        pdfs_dir = '{}/pdfs'.format(self.project_path)
+        
+        if len([pdf for pdf in os.listdir(pdfs_dir) if pdf.endswith('pdf')]) != 1:
+            raise Exception('1 and only 1 pdf allowed in pdfs for this action')
+        pdf_name = [pdf for pdf in os.listdir(pdfs_dir) if pdf.endswith('pdf')][0]
+
+        # make sure pdftk available
+        with open('/dev/null', 'wb') as f:
+            if subprocess.call(['which', 'pdftk',], stdout=f, stderr=f):
+                raise Exception('pdftk must be available to expand pdfs')
+
+        maybe_make_dir('{}/working'.format(pdfs_dir))
+        cmd = 'pdftk {}/{} burst output {}/working/%d.pdf'.format(pdfs_dir, pdf_name, pdfs_dir)
+        if self.verbose:
+            print cmd
+        os.system(cmd)
+
+    def extract_text_from_pdf(self):
+        # make sure pdftotext available
+        with open('/dev/null', 'wb') as f:
+            if subprocess.call(['which', 'pdftotext',], stdout=f, stderr=f):
+                raise Exception('pdftotext must be available to extract text from pdfs')
+
+        raw_text_dir = '{}/text/raw'.format(self.project_path)
+        maybe_make_dir(raw_text_dir)
+        clean_text_dir = '{}/text/clean'.format(self.project_path)
+        maybe_make_dir(clean_text_dir)
+
+
+        for filename in os.listdir('{}/pdfs/working'.format(self.project_path)):
+            page_nbr, extension = os.path.splitext(filename)
+            if extension == '.pdf':
+                raw_text_file = '{}/{}.txt'.format(raw_text_dir, page_nbr)
+                cmd = 'pdftotext {}/pdfs/working/{} {}'.format(self.project_path, filename, raw_text_file)
+                if self.verbose:
+                    print cmd
+                os.system(cmd)
+                os.system("sed -i '/^$/d' {}".format(raw_text_file))
+                shutil.copy(raw_text_file, clean_text_dir)
+        
+    def make_images_from_pdf(self):
+        # make sure convert available
+        with open('/dev/null', 'wb') as f:
+            if subprocess.call(['which', 'convert',], stdout=f, stderr=f):
+                raise Exception('convert must be available to make images from pdfs')
+
+        page_image_dir = '{}/images/pages'.format(self.project_path)
+        maybe_make_dir(page_image_dir)
+
+        for filename in os.listdir('{}/pdfs/working'.format(self.project_path)):
+            page_nbr, extension = os.path.splitext(filename)
+            if extension == '.pdf':
+                page_image_file = '{}/{}.pbm'.format(page_image_dir, page_nbr)
+                cmd = 'convert -density 200 -trim -bordercolor White -border 2x2 +repage {}/pdfs/working/{} {}'.format(self.project_path, filename, page_image_file)
+                if self.verbose:
+                    print cmd
+                os.system(cmd)
 
 class TiffProcessor(PdfProcessor):
     """ Same thing, but for multipage tiff files."""

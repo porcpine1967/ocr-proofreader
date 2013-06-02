@@ -16,7 +16,7 @@ import document_builder
 import line_manager
 import spell_checker
 
-WIDTH = 800
+WIDTH = 1300
 
 class App(wx.App):
     def OnInit(self):

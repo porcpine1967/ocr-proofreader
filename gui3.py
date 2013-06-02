@@ -11,7 +11,7 @@ import wx.lib.rcsizer as rcs
 
 import line_manager
 
-WIDTH = 800
+WIDTH = 1300
 
 class App(wx.App):
     def OnInit(self):

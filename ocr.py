@@ -474,6 +474,12 @@ def extract_text(verbose):
     pdf_processor = process_pdf.PdfProcessor(verbose)
     pdf_processor.extract_text_from_pages(tesseract_lang)
 
+def extract_pdf(verbose):
+    pdf_processor = process_pdf.PdfProcessor(verbose)
+    pdf_processor.expand_pdfs()
+    pdf_processor.extract_text_from_pdf()
+    pdf_processor.make_images_from_pdf()
+
 def symlink_images(verbose):
     pdf_processor = process_pdf.PdfProcessor(verbose)
     pdf_processor.symlink_images()
@@ -549,6 +555,7 @@ def run():
         ('extract_all', 'Extracts images and text'),
         ('extract_images', 'Extract page images from pdfs/tiffs'),
         ('extract_text', 'Extracts text from images'),
+        ('extract_pdf', 'Extracts text from pdf, makes images of pages'),
         ('page_info', 'Writes out page info for mapping lines to image location'),
         ('spell_check', 'Writes maybe_ok file'),
         ('gui2', 'Looks for words in maybe_ok to see if should add to dict'),
@@ -631,6 +638,8 @@ def run():
         symlink_images(args.verbose)
     elif args.action in ('extract_text', 't',):
         extract_text(args.verbose)
+    elif args.action in ('extract_pdf', 'asfdasft',):
+        extract_pdf(args.verbose)
     elif args.action in ('spell_check', 'a',):
         aspell_clean()
     elif args.action in ('page_info', 'pi',):
