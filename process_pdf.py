@@ -366,7 +366,7 @@ class TiffProcessor(PdfProcessor):
         os.chdir(self.project_path)
         for full_filename in os.listdir('pdfs'):
             os.chdir(self.project_path)
-            if full_filename.endswith('tiff'):
+            if full_filename.endswith('tiff') or full_filename.endswith('tif'):
                 filename, ext = os.path.splitext(full_filename)
                 working_dir = 'images/raw/{}'.format(filename)
                 maybe_make_dir(working_dir)

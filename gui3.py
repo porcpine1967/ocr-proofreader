@@ -99,7 +99,7 @@ class BaseFrame(wx.Frame):
             self.editCtrl.SetFocus()
     def OnAddSection(self, event):
         if self.line:
-            self.line.set_text(u'<p>-<p>{}'.format(self.editCtrl.GetValue()))
+            self.line.set_text(u'<p class="section">{}'.format(self.editCtrl.GetValue()))
             self.OnNextLine(None)
     def OnAddParagraph(self, event):
         if self.line:
@@ -150,7 +150,7 @@ class BaseFrame(wx.Frame):
             self.current_text.Add(add_paragraph_button, row=button_row, col=1)
 
             button_row += 1
-            add_section_button = wx.Button(self.panel, wx.ID_ANY, label='+ <p>-<p>', size=(90, 30))
+            add_section_button = wx.Button(self.panel, wx.ID_ANY, label='+ section', size=(90, 30))
             self.Bind(wx.EVT_BUTTON, self.OnAddSection, add_section_button)
             add_section_button.SetDefault()
             add_section_button.SetSize(add_section_button.GetBestSize())

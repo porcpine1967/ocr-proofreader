@@ -243,7 +243,7 @@ def new():
         os.mkdir('pdfs')
         for filename in os.listdir('.'):
             print filename
-            if filename.endswith('pdf') or filename.endswith('tiff'):
+            if filename.endswith('pdf') or filename.endswith('tif') or filename.endswith('tiff'):
                 shutil.move(filename, 'pdfs')
     
     # Set up/update config

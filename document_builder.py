@@ -252,14 +252,12 @@ class SpellcheckDocMaker(object):
             os.makedirs('working/page_info')
 
         for fn in os.listdir(text_dir_):
-            print fn
             name, extension = os.path.splitext(fn)
             text_path = '{}/{}.txt'.format(text_dir_, name)
             image_path = '{}/{}.pbm'.format(images_dir_, name)
             if extension == '.txt' and os.path.exists(image_path):
                 with open('working/page_info/{}.csv'.format(name), 'wb') as f:
                     writer = csv.writer(f)
-                    print 'in'    
                     sys.stdout.write('.')
                     pi = PageInfo(image_path, text_path)
                     page_lines = pi.line_guess()

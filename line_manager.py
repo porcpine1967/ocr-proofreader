@@ -26,6 +26,10 @@ HTML_HEADER = """
   <head>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <title>{}</title>
+  <style type="text/css">
+    p{text-indent:1.5em;margin:0}
+    p.section{margin-top:1em}
+  </style>
   </head>
 <body>
 <p>{}</p>
